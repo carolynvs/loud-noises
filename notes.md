@@ -55,3 +55,10 @@ https://slackoverload.com
 * Runs the app in a container
 * Runs with a [managed identity](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-managed-identity)
   so that the process transparently has access to keyvault
+  
+# Deployments
+
+docker build -t carolynvs/slackoverload:v0.0.2 .
+docker push carolynvs/slackoverload:v0.0.2
+az container dleete -g slackoverload --nme slackoverload
+az container create -g slackoverload --name slackoverload --image carolynvs/slackoverload:v0.0.2 --dns-name-label slackoverload --ports 8080 --assign-identity /subscriptions/83f90879-de5f-4c9e-9459-593fb2a17c89/resourcegroups/slackoverload/providers/Microsoft.ManagedIdentity/userAssignedIdentities/slackoverload-api
