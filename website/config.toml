@@ -1,0 +1,8 @@
+baseURL = "https://slackoverload.com"
+languageCode = "en-us"
+title = "Slack Overload"
+theme = "gopher"
+
+[params]
+  description = "Manage your status across multiple slack teams with one click"
+  image = "/img/logo.png"

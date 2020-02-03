@@ -47,5 +47,11 @@ https://slack.com/oauth/authorize?client_id=2413351231.504877832356&user_scope=d
 
 https://slackoverload.com
 
-* /* -> container
-* /slack/* -> 
+* /* -> storage container
+* /slack/* -> ACI
+
+## ACI
+
+* Runs the app in a container
+* Runs with a [managed identity](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-managed-identity)
+  so that the process transparently has access to keyvault

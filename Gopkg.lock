@@ -2,35 +2,106 @@
 
 
 [[projects]]
-  digest = "1:80f394537967d97fcc0da30762843805c8aaea7d208c43c99d1fe988a8888f0d"
+  digest = "1:18df20b3a1a4c4d020608c96331d6acd6a89615073e72f8c417549f7f2d4a9f5"
+  name = "github.com/Azure/azure-sdk-for-go"
+  packages = [
+    "services/keyvault/auth",
+    "services/keyvault/v7.0/keyvault",
+    "version",
+  ]
+  pruneopts = "NUT"
+  revision = "89b3129aee15cb9fb017e12a1980f2993c609125"
+  version = "v39.0.0"
+
+[[projects]]
+  digest = "1:6bcb67d993a2303fe302d18ab0759f3d3161cf64a7387ca1504ba8fee51ece94"
+  name = "github.com/Azure/go-autorest"
+  packages = [
+    "autorest",
+    "autorest/adal",
+    "autorest/azure",
+    "autorest/azure/auth",
+    "autorest/azure/cli",
+    "autorest/date",
+    "autorest/to",
+    "autorest/validation",
+    "logger",
+    "tracing",
+  ]
+  pruneopts = "NUT"
+  revision = "20a15b4e99645bc30a1cf8de518a6e8ac331c864"
+  version = "v13.3.2"
+
+[[projects]]
+  digest = "1:7a6852b35eb5bbc184561443762d225116ae630c26a7c4d90546619f1e7d2ad2"
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
+
+[[projects]]
+  digest = "1:f9adc21a937e5da643ea14a3488cb7506788876737a5e205394e508627a6eec8"
+  name = "github.com/dimchansky/utfbom"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "d2133a1ce379ef6fa992b0514a77146c60db9d1c"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:4a0c072e44da763409da72d41492373a034baf2e6d849c76d239b4abdfbb6c49"
   name = "github.com/gorilla/websocket"
   packages = ["."]
-  pruneopts = "T"
+  pruneopts = "NUT"
   revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
   version = "v1.4.0"
 
 [[projects]]
-  digest = "1:4ed08e0015b6420e81425b800bab0955e7d54a3a2b70bf8fa83fb9eed544f96f"
+  digest = "1:f9f72e583aaacf1d1ac5d6121abd4afd3c690baa9e14e1d009df26bf831ba347"
+  name = "github.com/mitchellh/go-homedir"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "af06845cf3004701891bf4fdb884bfe4920b3727"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:19d3f3e62f56cffda6ecb51166686ed040f5391d2e060beac543f04f2de28ae1"
   name = "github.com/nlopes/slack"
   packages = [
     ".",
     "slackutilsx",
   ]
-  pruneopts = "T"
+  pruneopts = "NUT"
   revision = "b9033a72a20bf84563485e86a2adbea4bf265804"
   version = "v0.4.0"
 
 [[projects]]
-  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  digest = "1:5cf3f025cbee5951a4ee961de067c8a89fc95a5adabead774f82822efabab121"
   name = "github.com/pkg/errors"
   packages = ["."]
-  pruneopts = "T"
+  pruneopts = "NUT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:f604f5e2ee721b6757d962dfe7bab4f28aae50c456e39cfb2f3819762a44a6ae"
+  name = "golang.org/x/crypto"
+  packages = [
+    "pkcs12",
+    "pkcs12/internal/rc2",
+  ]
+  pruneopts = "NUT"
+  revision = "69ecbb4d6d5dab05e49161c6e77ea40a030884e1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = ["github.com/nlopes/slack"]
+  input-imports = [
+    "github.com/Azure/azure-sdk-for-go/services/keyvault/auth",
+    "github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault",
+    "github.com/Azure/go-autorest/autorest/azure/auth",
+    "github.com/nlopes/slack",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
