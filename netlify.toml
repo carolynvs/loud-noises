@@ -1,0 +1,9 @@
+[settings]
+  ID = "slackoverload"
+
+[build]
+  publish = "website/public"
+  command = "hugo -s website"
+
+[build.environment]
+  HUGO_VERSION = "0.53"
