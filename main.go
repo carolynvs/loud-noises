@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -57,16 +58,19 @@ func main() {
 }
 
 func HandleTrigger(writer http.ResponseWriter, request *http.Request) {
-	name := request.URL.Query().Get("text")
+	name := request.FormValue("text")
 	err := Trigger(name)
 	if err != nil {
-		writer.WriteHeader(500)
-		writer.Write([]byte(err.Error()))
+		writer.WriteHeader(200)
+		writer.Write(buildSlackError(err))
+		return
 	}
+
+	writer.WriteHeader(200)
 }
 
 func Trigger(name string) error {
-	fmt.Printf("/trigger %s\n", name)
+	fmt.Printf("Triggering %s\n", name)
 
 	token, err := getSlackToken()
 	if err != nil {
@@ -132,6 +136,16 @@ func Trigger(name string) error {
 	}
 
 	return nil
+}
+
+func buildSlackError(err error) []byte {
+	response := map[string]string{
+		"response_type": "ephemeral",
+		"text":          err.Error(),
+	}
+
+	b, _ := json.Marshal(response)
+	return b
 }
 
 func minutes(value int) *int {
