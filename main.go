@@ -72,6 +72,8 @@ func main() {
 
 	http.HandleFunc("/slack/cmd/trigger", HandleTrigger)
 	http.HandleFunc("/slack/cmd/create-trigger", HandleCreateTrigger)
+	http.HandleFunc("/slack/cmd/clear-status", HandleClearStatus)
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -97,6 +99,20 @@ func HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	err := CreateTrigger(cr)
+	if err != nil {
+		HandleError(writer, err)
+		return
+	}
+
+	writer.WriteHeader(200)
+}
+
+func HandleClearStatus(writer http.ResponseWriter, request *http.Request) {
+	tr := ClearStatusRequest{
+		SlackPayload: getSlackPayload(request),
+	}
+
+	err := ClearStatus(tr)
 	if err != nil {
 		HandleError(writer, err)
 		return
@@ -133,6 +149,11 @@ func getSlackPayload(request *http.Request) SlackPayload {
 	}
 }
 
+type ClearStatusRequest struct {
+	SlackPayload
+	Global bool
+}
+
 type TriggerRequest struct {
 	SlackPayload
 	Name string
@@ -150,16 +171,30 @@ type SlackPayload struct {
 	TeamName string
 }
 
+func ClearStatus(r ClearStatusRequest) error {
+	fmt.Printf("Clearing Status for %s(%s) on %s(%s)\n",
+		r.UserName, r.UserId, r.TeamName, r.TeamId)
+
+	action := Action{
+		Presence: PresenceActive,
+	}
+	return updateSlackStatus(r.SlackPayload, action)
+}
+
 func Trigger(r TriggerRequest) error {
 	fmt.Printf("Triggering %s from %s(%s) on %s(%s)\n",
 		r.Name, r.UserName, r.UserId, r.TeamName, r.TeamId)
 
-	token, err := getSlackToken()
+	action, err := getTrigger(r)
 	if err != nil {
 		return err
 	}
 
-	action, err := getTrigger(r)
+	return updateSlackStatus(r.SlackPayload, action)
+}
+
+func updateSlackStatus(payload SlackPayload, action Action) error {
+	token, err := getSlackToken()
 	if err != nil {
 		return err
 	}
@@ -178,7 +213,7 @@ func Trigger(r TriggerRequest) error {
 	}
 
 	if !action.DnD {
-		dndState, err := api.GetDNDInfo(&r.UserId)
+		dndState, err := api.GetDNDInfo(&payload.UserId)
 		if err != nil {
 			return errors.Wrapf(err, "could not retrieve user's current DND state")
 		}
@@ -186,7 +221,6 @@ func Trigger(r TriggerRequest) error {
 			_, err = api.EndSnooze()
 			if err != nil {
 				return errors.Wrap(err, "could not end do not disturb")
-				return err
 			}
 		}
 	} else if action.DnD {
@@ -195,7 +229,6 @@ func Trigger(r TriggerRequest) error {
 			return errors.Wrap(err, "could not set do not disturb")
 		}
 	}
-
 	return nil
 }
 
@@ -291,6 +324,10 @@ const (
 )
 
 func parseDuration(value string) (time.Duration, error) {
+	if value == "" {
+		return time.Duration(0), nil
+	}
+
 	r := regexp.MustCompile(`^(\d+)([wd])$`)
 	match := r.FindStringSubmatch(value)
 	if len(match) == 0 {
