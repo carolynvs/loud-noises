@@ -48,21 +48,29 @@ type ActionTemplate struct {
 	Action
 }
 
-/*
-token=gIkuvaNzQIHg97ATvDxqgjtO
-&team_id=T0001
-&team_domain=example
-&enterprise_id=E0001
-&enterprise_name=Globular%20Construct%20Inc
-&channel_id=C2147483705
-&channel_name=test
-&user_id=U2147483697
-&user_name=Steve
-&command=/weather
-&text=94070
-&response_url=https://hooks.slack.com/commands/1234/5678
-&trigger_id=13345224609.738474920.8088930838d88f008e0
-*/
+func (t ActionTemplate) ToString() string {
+	statusText := ""
+	if t.StatusText != "" {
+		statusText = fmt.Sprintf(" %s", t.StatusText)
+	}
+
+	emojiText := ""
+	if t.StatusEmoji != "" {
+		emojiText = fmt.Sprintf(" (%s)", t.StatusEmoji)
+	}
+
+	dndText := ""
+	if t.DnD {
+		dndText = fmt.Sprintf(" DND")
+	}
+
+	durationText := ""
+	if t.Duration != 0 {
+		durationText = fmt.Sprintf(" for %s", time.Duration(t.Duration).String())
+	}
+
+	return fmt.Sprintf("%s = %s%s%s%s", t.Name, statusText, emojiText, dndText, durationText)
+}
 
 var debugFlag *bool
 
@@ -70,11 +78,26 @@ func main() {
 	debugFlag = flag.Bool("debug", false, "Print debug statements")
 	flag.Parse()
 
+	http.HandleFunc("/slack/cmd/list-triggers", HandleListTriggers)
 	http.HandleFunc("/slack/cmd/trigger", HandleTrigger)
 	http.HandleFunc("/slack/cmd/create-trigger", HandleCreateTrigger)
 	http.HandleFunc("/slack/cmd/clear-status", HandleClearStatus)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func HandleListTriggers(writer http.ResponseWriter, request *http.Request) {
+	tr := ListTriggersRequest{
+		SlackPayload: getSlackPayload(request),
+	}
+
+	response, err := ListTriggers(tr)
+	if err != nil {
+		ReturnError(writer, err)
+		return
+	}
+
+	ReturnResponse(writer, response)
 }
 
 func HandleTrigger(writer http.ResponseWriter, request *http.Request) {
@@ -85,7 +108,7 @@ func HandleTrigger(writer http.ResponseWriter, request *http.Request) {
 
 	err := Trigger(tr)
 	if err != nil {
-		HandleError(writer, err)
+		ReturnError(writer, err)
 		return
 	}
 
@@ -100,7 +123,7 @@ func HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
 
 	err := CreateTrigger(cr)
 	if err != nil {
-		HandleError(writer, err)
+		ReturnError(writer, err)
 		return
 	}
 
@@ -114,30 +137,51 @@ func HandleClearStatus(writer http.ResponseWriter, request *http.Request) {
 
 	err := ClearStatus(tr)
 	if err != nil {
-		HandleError(writer, err)
+		ReturnError(writer, err)
 		return
 	}
 
 	writer.WriteHeader(200)
 }
 
-func HandleError(writer http.ResponseWriter, err error) {
-	fmt.Printf("%v\n", err)
+func ReturnResponse(writer http.ResponseWriter, msg slack.Msg) {
+	if *debugFlag {
+		log.Printf("%s\n", msg.Text)
+	}
 	writer.Header().Set("Content-type", "application/json")
 	writer.WriteHeader(200)
-	jErr := buildSlackError(err)
-	fmt.Printf("%s\n", string(jErr))
-	writer.Write(jErr)
-}
-
-func buildSlackError(err error) []byte {
-	response := map[string]string{
-		"response_type": "ephemeral",
-		"text":          err.Error(),
+	b, err := json.Marshal(msg)
+	if err != nil {
+		err = errors.Wrapf(err, "error marshaling message to return to Slack, %#v", msg)
+		log.Printf("%v\n", err)
+		writer.Write([]byte("an error occurred"))
+		return
 	}
 
-	b, _ := json.Marshal(response)
-	return b
+	writer.Write(b)
+}
+
+func ReturnError(writer http.ResponseWriter, err error) {
+	log.Printf("%v\n", err)
+	writer.Header().Set("Content-type", "application/json")
+	writer.WriteHeader(200)
+	slackErr, err := buildSlackError(err)
+	if err != nil {
+		err = errors.Wrap(err, "could not handle and return an error to Slack")
+		log.Printf("%v\n", err)
+		writer.Write([]byte("an error occurred"))
+		return
+	}
+	writer.Write(slackErr)
+}
+
+func buildSlackError(err error) ([]byte, error) {
+	response := slack.Msg{
+		Text:         err.Error(),
+		ResponseType: slack.ResponseTypeEphemeral,
+	}
+
+	return json.Marshal(response)
 }
 
 func getSlackPayload(request *http.Request) SlackPayload {
@@ -150,6 +194,11 @@ func getSlackPayload(request *http.Request) SlackPayload {
 }
 
 type ClearStatusRequest struct {
+	SlackPayload
+	Global bool
+}
+
+type ListTriggersRequest struct {
 	SlackPayload
 	Global bool
 }
@@ -181,16 +230,50 @@ func ClearStatus(r ClearStatusRequest) error {
 	return updateSlackStatus(r.SlackPayload, action)
 }
 
+func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
+	fmt.Printf("Listing Triggers for %s(%s) on %s(%s)\n",
+		r.UserName, r.UserId, r.TeamName, r.TeamId)
+
+	client, err := NewStorageClient()
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	userDir := r.UserId + "/"
+	blobNames, err := client.listContainer("triggers", userDir)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	triggers := make([]string, len(blobNames))
+	for i, blobName := range blobNames {
+		triggerName := strings.TrimPrefix(blobName, userDir)
+		trigger, err := getTrigger(r.UserId, triggerName)
+		if err != nil {
+			return slack.Msg{}, err
+		}
+
+		triggers[i] = trigger.ToString()
+	}
+
+	msg := slack.Msg{
+		ResponseType: slack.ResponseTypeEphemeral,
+		Text:         strings.Join(triggers, "\n"),
+	}
+
+	return msg, nil
+}
+
 func Trigger(r TriggerRequest) error {
 	fmt.Printf("Triggering %s from %s(%s) on %s(%s)\n",
 		r.Name, r.UserName, r.UserId, r.TeamName, r.TeamId)
 
-	action, err := getTrigger(r)
+	action, err := getTrigger(r.UserId, r.Name)
 	if err != nil {
 		return err
 	}
 
-	return updateSlackStatus(r.SlackPayload, action)
+	return updateSlackStatus(r.SlackPayload, action.Action)
 }
 
 func updateSlackStatus(payload SlackPayload, action Action) error {
@@ -259,25 +342,25 @@ func CreateTrigger(r CreateTriggerRequest) error {
 	return client.setBlob("triggers", key, tmplB)
 }
 
-func getTrigger(r TriggerRequest) (Action, error) {
+func getTrigger(userId string, name string) (ActionTemplate, error) {
 	client, err := NewStorageClient()
 	if err != nil {
-		return Action{}, err
+		return ActionTemplate{}, err
 	}
 
-	key := path.Join(r.UserId, r.Name)
+	key := path.Join(userId, name)
 	b, err := client.getBlob("triggers", key)
 	if err != nil {
-		if strings.Contains(errors.Cause(err).Error(), "BlobNotFound") {
-			return Action{}, errors.Errorf("trigger %s not registered", r.Name)
+		if strings.Contains(err.Error(), "BlobNotFound") {
+			return ActionTemplate{}, errors.Errorf("trigger %s not registered", name)
 		}
-		return Action{}, err
+		return ActionTemplate{}, err
 	}
 
-	var action Action
+	var action ActionTemplate
 	err = json.Unmarshal(b, &action)
 	if err != nil {
-		return Action{}, errors.Wrapf(err, "error unmarshaling trigger %s: %s", r.Name, string(b))
+		return ActionTemplate{}, errors.Wrapf(err, "error unmarshaling trigger %s: %s", name, string(b))
 	}
 
 	return action, nil
@@ -418,6 +501,30 @@ func NewStorageClient() (Storage, error) {
 	s.pipeline = azblob.NewPipeline(s.credential, azblob.PipelineOptions{})
 
 	return s, nil
+}
+
+func (s *Storage) listContainer(containerName string, prefix string) ([]string, error) {
+	container, err := s.buildContainerURL(containerName)
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for marker := (azblob.Marker{}); marker.NotDone(); {
+		response, err := container.ListBlobsFlatSegment(context.Background(), marker, azblob.ListBlobsSegmentOptions{
+			Prefix: prefix,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "error listing container %s with prefix %s", containerName, prefix)
+		}
+
+		marker = response.NextMarker
+		for _, blobInfo := range response.Segment.BlobItems {
+			names = append(names, blobInfo.Name)
+		}
+	}
+
+	return names, nil
 }
 
 func (s *Storage) getBlob(containerName string, blobName string) ([]byte, error) {

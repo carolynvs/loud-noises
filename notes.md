@@ -51,6 +51,7 @@ These are built-in so that you don't need to make a trigger
 
 ```
 /list-triggers
+/list-global-triggers
 ```
 
 # Infra
