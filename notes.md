@@ -2,6 +2,7 @@
 https://slack.com/oauth/authorize?client_id=2413351231.504877832356&user_scope=dnd:write,users:write,users.profile:write
 
 ## scopes
+* dnd:read - See your DND status
 * dnd:write - Set yourself to DND and back
 * users:write - Set yourself to away and back
 * users.profile:write - Set your status message / emoji
@@ -18,6 +19,17 @@ https://slack.com/oauth/authorize?client_id=2413351231.504877832356&user_scope=d
 /create-global-trigger sick = out sick (🤒) DND
 
 /create-trigger off-work = DND
+
+/create-global-trigger busy = (😱)
+```
+
+## Clear your status
+
+These are built-in so that you don't need to make a trigger
+
+```
+/clear-status
+/clear-global-status
 ```
 
 ## Manual trigger
@@ -43,22 +55,21 @@ https://slack.com/oauth/authorize?client_id=2413351231.504877832356&user_scope=d
 
 # Infra
 
-## Frontdoor
+## Domain
 
-https://slackoverload.com
-
-* /* -> storage container
-* /slack/* -> ACI
+* slackoverload.com -> Netlify
+* cmd.slackoverload.com -> ACI
 
 ## ACI
 
 * Runs the app in a container
 * Runs with a [managed identity](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-managed-identity)
   so that the process transparently has access to keyvault
-  
-# Deployments
+* Deploy with ./redeploy.sh
 
-docker build -t carolynvs/slackoverload:v0.0.2 .
-docker push carolynvs/slackoverload:v0.0.2
-az container delete -g slackoverload --name slackoverload
-az container create -g slackoverload --name slackoverload --image carolynvs/slackoverload:v0.0.2 --dns-name-label slackoverload --ports 8080 --assign-identity /subscriptions/83f90879-de5f-4c9e-9459-593fb2a17c89/resourcegroups/slackoverload/providers/Microsoft.ManagedIdentity/userAssignedIdentities/slackoverload-api
+## Data
+
+* OAuth tokens -> keyvault
+* User configuration -> blob storage
+    * triggers: userid/trigger
+    * schedule: userid/schedule

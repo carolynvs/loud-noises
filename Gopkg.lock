@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:602649ff074ccee9273e1d3b25c4069f13a70fa0c232957c7d68a6f02fb7a9ea"
+  name = "github.com/Azure/azure-pipeline-go"
+  packages = ["pipeline"]
+  pruneopts = "NUT"
+  revision = "232aee85e8e3a6223a11c0943f7df2ae0fac00e4"
+  version = "v0.2.2"
+
+[[projects]]
   digest = "1:18df20b3a1a4c4d020608c96331d6acd6a89615073e72f8c417549f7f2d4a9f5"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
@@ -12,6 +20,14 @@
   pruneopts = "NUT"
   revision = "89b3129aee15cb9fb017e12a1980f2993c609125"
   version = "v39.0.0"
+
+[[projects]]
+  digest = "1:0a1307390445735712b3b914b447cc7ad1974795e50470b7e092cfaa6063f6dd"
+  name = "github.com/Azure/azure-storage-blob-go"
+  packages = ["azblob"]
+  pruneopts = "NUT"
+  revision = "fc700035fe4a7020f50d49f420b3c088aed57e03"
+  version = "v0.8.0"
 
 [[projects]]
   digest = "1:6bcb67d993a2303fe302d18ab0759f3d3161cf64a7387ca1504ba8fee51ece94"
@@ -57,6 +73,14 @@
   version = "v1.4.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:4b1a6176a74a3339ad0407185eb8418a616dbfdca76c779e5548ea821e17a6e6"
+  name = "github.com/mattn/go-ieproxy"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "2dbc853185d9515cd0b7934cc7bfedab1565ac04"
+
+[[projects]]
   digest = "1:f9f72e583aaacf1d1ac5d6121abd4afd3c690baa9e14e1d009df26bf831ba347"
   name = "github.com/mitchellh/go-homedir"
   packages = ["."]
@@ -65,15 +89,17 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:19d3f3e62f56cffda6ecb51166686ed040f5391d2e060beac543f04f2de28ae1"
+  digest = "1:75aa2d27470d17962a1bb00b8fa949c8c78ca278d1aa61632810028ae34d1cf2"
   name = "github.com/nlopes/slack"
   packages = [
     ".",
+    "internal/errorsx",
+    "internal/timex",
     "slackutilsx",
   ]
   pruneopts = "NUT"
-  revision = "b9033a72a20bf84563485e86a2adbea4bf265804"
-  version = "v0.4.0"
+  revision = "1af34b6bda3d43878255fff7bd2884ea0c23295e"
+  version = "v0.6.0"
 
 [[projects]]
   digest = "1:5cf3f025cbee5951a4ee961de067c8a89fc95a5adabead774f82822efabab121"
@@ -94,14 +120,65 @@
   pruneopts = "NUT"
   revision = "69ecbb4d6d5dab05e49161c6e77ea40a030884e1"
 
+[[projects]]
+  branch = "master"
+  digest = "1:daaeae7382ad31d525832c97a54b90a053d4894283304fa36014226f0a0e04bb"
+  name = "golang.org/x/net"
+  packages = [
+    "http/httpproxy",
+    "idna",
+  ]
+  pruneopts = "NUT"
+  revision = "16171245cfb220d5317888b716d69c1fb4e7992b"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c3c62d22be48b622ed03d69280da029de14572531772763576a97c40acae09fa"
+  name = "golang.org/x/sys"
+  packages = [
+    "windows",
+    "windows/registry",
+  ]
+  pruneopts = "NUT"
+  revision = "d101bd2416d505c0448a6ce8a282482678040a89"
+
+[[projects]]
+  digest = "1:8d8faad6b12a3a4c819a3f9618cb6ee1fa1cfc33253abeeea8b55336721e3405"
+  name = "golang.org/x/text"
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/language",
+    "internal/language/compact",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable",
+  ]
+  pruneopts = "NUT"
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Azure/azure-pipeline-go/pipeline",
     "github.com/Azure/azure-sdk-for-go/services/keyvault/auth",
     "github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault",
-    "github.com/Azure/go-autorest/autorest/azure/auth",
+    "github.com/Azure/azure-storage-blob-go/azblob",
+    "github.com/Azure/go-autorest/autorest",
+    "github.com/Azure/go-autorest/autorest/adal",
     "github.com/nlopes/slack",
+    "github.com/pkg/errors",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
