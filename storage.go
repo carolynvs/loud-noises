@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/pkg/errors"
 )
 
@@ -19,24 +21,30 @@ type Storage struct {
 }
 
 func NewStorageClient() (Storage, error) {
-	// See https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-app
-	msiEndpoint, _ := adal.GetMSIEndpoint()
-	resource := "https://slackoverload.blob.core.windows.net"
-	spToken, err := adal.NewServicePrincipalTokenFromMSI(msiEndpoint, resource)
+	s := Storage{Account: "slackoverload"}
+
+	a, err := getAzureAuth(s.URL())
 	if err != nil {
-		return Storage{}, errors.Wrap(err, "error building azure token request")
-	}
-	err = spToken.EnsureFresh()
-	if err != nil {
-		return Storage{}, errors.Wrap(err, "error requesting azure token")
+		return s, err
 	}
 
-	token := spToken.OAuthToken()
-	s := Storage{Account: "slackoverload"}
+	fakeAuthRequest := &http.Request{}
+	fakeAuthRequest, err = autorest.Prepare(fakeAuthRequest, a.WithAuthorization())
+	if err != nil {
+		return s, errors.Wrap(err, "could not get auth token from authorizer")
+	}
+	authHeader := fakeAuthRequest.Header.Get("Authorization")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	fmt.Println("scrapped token: ", token)
+
 	s.credential = azblob.NewTokenCredential(token, nil)
 	s.pipeline = azblob.NewPipeline(s.credential, azblob.PipelineOptions{})
 
 	return s, nil
+}
+
+func (s *Storage) URL() string {
+	return fmt.Sprintf("https://%s.blob.core.windows.net", s.Account)
 }
 
 func (s *Storage) listContainer(containerName string, prefix string) ([]string, error) {
@@ -97,7 +105,7 @@ func (s *Storage) setBlob(containerName string, blobName string, data []byte) er
 }
 
 func (s *Storage) buildContainerURL(containerName string) (azblob.ContainerURL, error) {
-	rawURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", s.Account, containerName)
+	rawURL := fmt.Sprintf("%s/%s", s.URL(), containerName)
 	URL, err := url.Parse(rawURL)
 	if err != nil {
 		return azblob.ContainerURL{}, errors.Wrapf(err, "could not parse container URL %s", rawURL)
