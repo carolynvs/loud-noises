@@ -16,12 +16,17 @@ func main() {
 	debugFlag = flag.Bool("debug", false, "Print debug statements")
 	flag.Parse()
 
+	http.HandleFunc("/health", HandleHealth)
 	http.HandleFunc("/list-triggers", HandleListTriggers)
 	http.HandleFunc("/trigger", HandleTrigger)
 	http.HandleFunc("/create-trigger", HandleCreateTrigger)
 	http.HandleFunc("/clear-status", HandleClearStatus)
 
 	log.Fatal(http.ListenAndServe(":80", nil))
+}
+
+func HandleHealth(writer http.ResponseWriter, request *http.Request) {
+	writer.WriteHeader(200)
 }
 
 func HandleListTriggers(writer http.ResponseWriter, request *http.Request) {
