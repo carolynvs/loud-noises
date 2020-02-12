@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const vaultURL = "https://slackoverload.vault.azure.net/"
+const vaultURL = "https://slackoverload.vault.azure.net"
 
 func getKeyVaultClient() (keyvault.BaseClient, error) {
-	authorizer, err := getAzureAuth(vaultURL)
+	authorizer, err := getAzureAuth("https://vault.azure.net")
 	if err != nil {
 		return keyvault.BaseClient{}, err
 	}
