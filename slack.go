@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -144,7 +143,7 @@ func Trigger(r TriggerRequest) error {
 }
 
 func updateSlackStatus(payload SlackPayload, action Action) error {
-	token, err := getSlackToken()
+	token, err := getSlackToken(payload.UserId)
 	if err != nil {
 		return err
 	}
@@ -299,23 +298,21 @@ func parseDuration(value string) (time.Duration, error) {
 	return time.Duration(num) * unit, nil
 }
 
-func getSlackToken() (string, error) {
+func getSlackToken(userId string) (string, error) {
+	slackOauthKey := "oauth-" + userId
+
 	client, err := getKeyVaultClient()
 	if err != nil {
-		fmt.Println("Loading slack token from env var...")
-		token := os.Getenv("SLACK_TOKEN")
-		if token == "" {
-			return "", fmt.Errorf("could not authenticate using ambient environment: %s", err.Error())
-		}
-		return token, nil
+		return "", errors.Wrap(err, "could not authenticate to Azure using ambient environment")
 	}
 
-	fmt.Println("Loading slack token from vault...")
-	grr, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	result, err := client.GetSecret(grr, vaultURL, "slack-token", "")
+	// Timebox getting the secret because a bad client or auth will hang forever
+	cxt, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+
+	result, err := client.GetSecret(cxt, vaultURL, slackOauthKey, "")
 	if err != nil {
 		defer cancel()
-		return "", fmt.Errorf("could not load slack token from vault: %s", err)
+		return "", errors.Wrapf(err, "could not load slack token from vault for user %s", userId)
 	}
 
 	return *result.Value, nil
