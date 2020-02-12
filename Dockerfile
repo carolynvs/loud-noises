@@ -6,6 +6,6 @@ WORKDIR /go/src/github.com/carolynvs/slackoverload
 COPY . /go/src/github.com/carolynvs/slackoverload/
 RUN go build .
 
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["./slackoverload"]

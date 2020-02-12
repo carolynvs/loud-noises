@@ -16,12 +16,12 @@ func main() {
 	debugFlag = flag.Bool("debug", false, "Print debug statements")
 	flag.Parse()
 
-	http.HandleFunc("/slack/cmd/list-triggers", HandleListTriggers)
-	http.HandleFunc("/slack/cmd/trigger", HandleTrigger)
-	http.HandleFunc("/slack/cmd/create-trigger", HandleCreateTrigger)
-	http.HandleFunc("/slack/cmd/clear-status", HandleClearStatus)
+	http.HandleFunc("/list-triggers", HandleListTriggers)
+	http.HandleFunc("/trigger", HandleTrigger)
+	http.HandleFunc("/create-trigger", HandleCreateTrigger)
+	http.HandleFunc("/clear-status", HandleClearStatus)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":80", nil))
 }
 
 func HandleListTriggers(writer http.ResponseWriter, request *http.Request) {
