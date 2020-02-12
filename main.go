@@ -17,6 +17,7 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/health", HandleHealth)
+	http.HandleFunc("/oauth", HandleOAuth)
 	http.HandleFunc("/list-triggers", HandleListTriggers)
 	http.HandleFunc("/trigger", HandleTrigger)
 	http.HandleFunc("/create-trigger", HandleCreateTrigger)
@@ -26,6 +27,21 @@ func main() {
 }
 
 func HandleHealth(writer http.ResponseWriter, request *http.Request) {
+	writer.WriteHeader(200)
+}
+
+func HandleOAuth(writer http.ResponseWriter, request *http.Request) {
+	or := OAuthRequest{
+		AuthGrant: request.FormValue("code"),
+	}
+
+	err := RefreshOAuthToken(or)
+	if err != nil {
+		log.Printf("%v\n", err)
+		writer.WriteHeader(500)
+		return
+	}
+
 	writer.WriteHeader(200)
 }
 

@@ -1,7 +1,10 @@
 # Auth Dance
 https://slack.com/oauth/authorize?client_id=2413351231.504877832356&user_scope=dnd:write,users:write,users.profile:write
 
-## scopes
+## bot scopes
+* commands - Enable slash commands
+
+## user scopes
 * dnd:read - See your DND status
 * dnd:write - Set yourself to DND and back
 * users:write - Set yourself to away and back

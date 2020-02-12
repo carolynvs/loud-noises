@@ -4,19 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault"
 	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
 )
 
 const (
-	PresenceAway   = "away"
-	PresenceActive = "auto"
+	PresenceAway     = "away"
+	PresenceActive   = "auto"
+	SlackOAuthURL    = "https://slack.com/api/oauth.v2.access"
+	OAuthRedirectURL = "https://cmd.slackoverload.com/oauth"
 )
 
 type Presence string
@@ -86,6 +91,26 @@ type SlackPayload struct {
 	TeamName string
 }
 
+type OAuthRequest struct {
+	AuthGrant string
+}
+
+type OAuthResponse struct {
+	Team OAuthTeam `json:"team"`
+	User OAuthUser `json:"authed_user"`
+}
+
+type OAuthTeam struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type OAuthUser struct {
+	Id          string `json:"id"`
+	Scopes      string `json:"scope"`
+	AccessToken string `json:"access_token"`
+}
+
 func ClearStatus(r ClearStatusRequest) error {
 	fmt.Printf("Clearing Status for %s(%s) on %s(%s)\n",
 		r.UserName, r.UserId, r.TeamName, r.TeamId)
@@ -140,6 +165,36 @@ func Trigger(r TriggerRequest) error {
 	}
 
 	return updateSlackStatus(r.SlackPayload, action.Action)
+}
+
+func RefreshOAuthToken(r OAuthRequest) error {
+	clientId, err := getSecret("slack-client-id")
+	if err != nil {
+		return err
+	}
+	clientSecret, err := getSecret("slack-client-secret")
+	if err != nil {
+		return err
+	}
+
+	data := url.Values{
+		"client_id":     {clientId},
+		"client_secret": {clientSecret},
+		"code":          {r.AuthGrant},
+	}
+	response, err := http.DefaultClient.PostForm(SlackOAuthURL, data)
+	if err != nil {
+		return errors.Wrap(err, "error requesting oauth token")
+	}
+
+	var tr OAuthResponse
+	err = json.NewDecoder(response.Body).Decode(&tr)
+	if err != nil {
+		return errors.Wrap(err, "error unmarshaling oauth token response")
+	}
+
+	err = setSlackToken(tr.User.Id, tr.Team.Id, tr.User.AccessToken, tr.User.Scopes)
+	return errors.Wrapf(err, "error saving oauth token for %s on %s(%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
 }
 
 func updateSlackStatus(payload SlackPayload, action Action) error {
@@ -299,8 +354,18 @@ func parseDuration(value string) (time.Duration, error) {
 }
 
 func getSlackToken(userId string) (string, error) {
-	slackOauthKey := "oauth-" + userId
+	return getSecret("oauth-" + userId)
+}
 
+func setSlackToken(userId string, teamId string, token string, scopes string) error {
+	tags := map[string]*string{
+		"scopes": &scopes,
+		"team":   &teamId,
+	}
+	return setSecret("oauth-"+userId, token, tags)
+}
+
+func getSecret(key string) (string, error) {
 	client, err := getKeyVaultClient()
 	if err != nil {
 		return "", errors.Wrap(err, "could not authenticate to Azure using ambient environment")
@@ -309,11 +374,31 @@ func getSlackToken(userId string) (string, error) {
 	// Timebox getting the secret because a bad client or auth will hang forever
 	cxt, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
-	result, err := client.GetSecret(cxt, vaultURL, slackOauthKey, "")
+	result, err := client.GetSecret(cxt, vaultURL, key, "")
 	if err != nil {
 		defer cancel()
-		return "", errors.Wrapf(err, "could not load slack token from vault for user %s", userId)
+		return "", errors.Wrapf(err, "could not load secret %q from vault", key)
 	}
 
 	return *result.Value, nil
+}
+
+func setSecret(key string, value string, tags map[string]*string) error {
+	client, err := getKeyVaultClient()
+	if err != nil {
+		return errors.Wrap(err, "could not authenticate to Azure using ambient environment")
+	}
+
+	// Timebox getting the secret because a bad client or auth will hang forever
+	cxt, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	_, err = client.SetSecret(cxt, vaultURL, key, keyvault.SecretSetParameters{
+		Value: &value,
+		Tags:  tags,
+	})
+	if err != nil {
+		defer cancel()
+		return errors.Wrapf(err, "error saving secret %s", key)
+	}
+
+	return nil
 }
