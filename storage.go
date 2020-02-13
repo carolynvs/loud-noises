@@ -35,7 +35,6 @@ func NewStorageClient() (Storage, error) {
 	}
 	authHeader := fakeAuthRequest.Header.Get("Authorization")
 	token := strings.TrimPrefix(authHeader, "Bearer ")
-	fmt.Println("scrapped token: ", token)
 
 	s.credential = azblob.NewTokenCredential(token, nil)
 	s.pipeline = azblob.NewPipeline(s.credential, azblob.PipelineOptions{})
