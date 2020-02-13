@@ -15,4 +15,4 @@ almost easier to just log off or set your phone on do not disturb. It is even mo
 complicated when you should be logged into some of your teams during the workday
 and others are really for your personal time.
 
-### Slack Overload manages status and DND across all of your teams with a single command
+### Slack Overload manages status across all of your teams with a single command

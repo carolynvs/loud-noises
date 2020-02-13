@@ -42,7 +42,7 @@ func HandleOAuth(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	writer.WriteHeader(200)
+	http.Redirect(writer, request, "https://slackoverload.com/quickstart", 302)
 }
 
 func HandleListTriggers(writer http.ResponseWriter, request *http.Request) {
