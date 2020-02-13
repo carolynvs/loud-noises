@@ -237,30 +237,39 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 }
 
 // CreateTrigger accepts a trigger definition and saves it
-func CreateTrigger(r CreateTriggerRequest) error {
+func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 	fmt.Printf("CreateTrigger %s from %s(%s) on %s(%s)\n",
 		r.Definition, r.UserName, r.UserId, r.TeamName, r.TeamId)
 
 	tmpl, err := parseTemplate(r.Definition)
 	if err != nil {
-		return err
+		return slack.Msg{}, err
 	}
 
 	tmpl.TeamId = r.TeamId
 
 	tmplB, err := json.Marshal(tmpl)
 	if err != nil {
-		return errors.Wrapf(err, "error marshaling trigger %s for %s(%s) on %s(%s): %#v",
+		return slack.Msg{}, errors.Wrapf(err, "error marshaling trigger %s for %s(%s) on %s(%s): %#v",
 			tmpl.Name, r.UserName, r.UserId, r.TeamName, r.TeamId, tmpl)
 	}
 
 	client, err := NewStorageClient()
 	if err != nil {
-		return err
+		return slack.Msg{}, err
 	}
 
 	key := path.Join(r.UserId, tmpl.Name)
-	return client.setBlob("triggers", key, tmplB)
+	err = client.setBlob("triggers", key, tmplB)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	msg := slack.Msg{
+		Type: slack.ResponseTypeEphemeral,
+		Text: fmt.Sprintf("Created trigger %s", tmpl.Name),
+	}
+	return msg, nil
 }
 
 func getTrigger(userId string, name string) (ActionTemplate, error) {

@@ -80,13 +80,13 @@ func HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
 		Definition:   request.FormValue("text"),
 	}
 
-	err := CreateTrigger(cr)
+	response, err := CreateTrigger(cr)
 	if err != nil {
 		ReturnError(writer, err)
 		return
 	}
 
-	writer.WriteHeader(200)
+	ReturnResponse(writer, response)
 }
 
 func HandleClearStatus(writer http.ResponseWriter, request *http.Request) {
