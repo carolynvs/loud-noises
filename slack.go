@@ -27,17 +27,48 @@ const (
 type Presence string
 
 type Action struct {
-	Presence    Presence
-	StatusText  string
-	StatusEmoji string
-	DnD         bool
-	Duration    int64
+	Presence    Presence `json:"presence"`
+	StatusText  string   `json:"status-text,omitempty"`
+	StatusEmoji string   `json:"status-emoji,omitempty"`
+	DnD         bool     `json:"dnd,omitempty"`
+	Duration    string   `json:"duration,omitempty"`
+}
+
+func (a Action) ParseDuration() (time.Duration, error) {
+	if a.Duration == "" {
+		return time.Duration(0), nil
+	}
+
+	r := regexp.MustCompile(`^(\d+)([wd])$`)
+	match := r.FindStringSubmatch(a.Duration)
+	if len(match) == 0 {
+		return time.ParseDuration(a.Duration)
+	}
+
+	num, err := strconv.Atoi(match[1])
+	if err != nil {
+		return time.Duration(0), err
+	}
+
+	var unit time.Duration
+	switch match[2] {
+	case "d":
+		unit = day
+	case "w":
+		unit = week
+	}
+	return time.Duration(num) * unit, nil
+}
+
+func (a Action) DurationInMinutes() int64 {
+	d, _ := a.ParseDuration()
+	return int64(d.Seconds())
 }
 
 type ActionTemplate struct {
-	Name   string
-	TeamId string
-	Action
+	Name   string `json:"name"`
+	TeamId string `json:"team-id"`
+	Action `json:"action"`
 }
 
 func (t ActionTemplate) ToString() string {
@@ -57,8 +88,8 @@ func (t ActionTemplate) ToString() string {
 	}
 
 	durationText := ""
-	if t.Duration != 0 {
-		durationText = fmt.Sprintf(" for %s", time.Duration(t.Duration).String())
+	if t.Duration != "" {
+		durationText = fmt.Sprintf(" for %s", t.Duration)
 	}
 
 	return fmt.Sprintf("%s = %s%s%s%s", t.Name, statusText, emojiText, dndText, durationText)
@@ -211,7 +242,7 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 		return err
 	}
 
-	err = api.SetUserCustomStatus(action.StatusText, action.StatusEmoji, action.Duration)
+	err = api.SetUserCustomStatus(action.StatusText, action.StatusEmoji, action.DurationInMinutes())
 	if err != nil {
 		return errors.Wrap(err, "could not set status")
 	}
@@ -228,7 +259,7 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 			}
 		}
 	} else if action.DnD {
-		_, err = api.SetSnooze(int(action.Duration))
+		_, err = api.SetSnooze(int(action.DurationInMinutes()))
 		if err != nil {
 			return errors.Wrap(err, "could not set do not disturb")
 		}
@@ -313,11 +344,6 @@ func parseTemplate(def string) (ActionTemplate, error) {
 		return ActionTemplate{}, errors.Errorf("Invalid trigger definition %q. Try /create-trigger vacation = I'm on a boat! (⛵️) DND for 1w", def)
 	}
 
-	duration, err := parseDuration(match[5])
-	if err != nil {
-		return ActionTemplate{}, errors.Errorf("invalid duration in trigger definition %q, here are some examples: 15m, 1h, 2d, 1w", match[5])
-	}
-
 	template := ActionTemplate{
 		Name: match[1],
 		Action: Action{
@@ -325,9 +351,15 @@ func parseTemplate(def string) (ActionTemplate, error) {
 			StatusText:  match[2],
 			StatusEmoji: match[3],
 			DnD:         match[4] != "",
-			Duration:    int64(duration.Minutes()),
+			Duration:    match[5],
 		},
 	}
+
+	_, err := template.ParseDuration()
+	if err != nil {
+		return ActionTemplate{}, errors.Errorf("invalid duration in trigger definition %q, here are some examples: 15m, 1h, 2d, 1w", template.Duration)
+	}
+
 	return template, nil
 }
 
@@ -335,32 +367,6 @@ const (
 	day  = 24 * time.Hour
 	week = 7 * day
 )
-
-func parseDuration(value string) (time.Duration, error) {
-	if value == "" {
-		return time.Duration(0), nil
-	}
-
-	r := regexp.MustCompile(`^(\d+)([wd])$`)
-	match := r.FindStringSubmatch(value)
-	if len(match) == 0 {
-		return time.ParseDuration(value)
-	}
-
-	num, err := strconv.Atoi(match[1])
-	if err != nil {
-		return time.Duration(0), err
-	}
-
-	var unit time.Duration
-	switch match[2] {
-	case "d":
-		unit = day
-	case "w":
-		unit = week
-	}
-	return time.Duration(num) * unit, nil
-}
 
 func getSlackToken(userId string) (string, error) {
 	return getSecret("oauth-" + userId)
