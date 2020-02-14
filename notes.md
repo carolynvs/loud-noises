@@ -76,4 +76,21 @@ These are built-in so that you don't need to make a trigger
 * OAuth tokens -> keyvault
 * User configuration -> blob storage
     * triggers: userid/trigger
-    * schedule: userid/schedule
+    * schedules: userid/schedule
+    * users: userid/user
+
+## User Management
+
+### Create User
+
+1. Add to slack
+1. Generate user id
+1. Store user object in blob storage
+    * collection of all the slack user ids associated so far
+1. Store oauth token in keyvault as oauth-slackid
+    * tag the secret with the user id
+
+### Lookup user
+
+1. Get slack user id from incoming slash webhook
+1. 

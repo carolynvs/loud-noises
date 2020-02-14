@@ -10,10 +10,9 @@
   version = "v0.2.2"
 
 [[projects]]
-  digest = "1:18df20b3a1a4c4d020608c96331d6acd6a89615073e72f8c417549f7f2d4a9f5"
+  digest = "1:f1e8eb5e22e6381ef6c6b80edbd2a71f1f7cbf0a6ce222a29106df08eebd16fb"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
-    "services/keyvault/auth",
     "services/keyvault/v7.0/keyvault",
     "version",
   ]
@@ -63,6 +62,14 @@
   pruneopts = "NUT"
   revision = "d2133a1ce379ef6fa992b0514a77146c60db9d1c"
   version = "v1.1.0"
+
+[[projects]]
+  digest = "1:ab3ec1fe3e39bac4b3ab63390767766622be35b7cab03f47f787f9ec60522a53"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
+  version = "v1.1.1"
 
 [[projects]]
   digest = "1:4a0c072e44da763409da72d41492373a034baf2e6d849c76d239b4abdfbb6c49"
@@ -172,11 +179,11 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Azure/azure-pipeline-go/pipeline",
-    "github.com/Azure/azure-sdk-for-go/services/keyvault/auth",
     "github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault",
     "github.com/Azure/azure-storage-blob-go/azblob",
     "github.com/Azure/go-autorest/autorest",
-    "github.com/Azure/go-autorest/autorest/adal",
+    "github.com/Azure/go-autorest/autorest/azure/auth",
+    "github.com/google/uuid",
     "github.com/nlopes/slack",
     "github.com/pkg/errors",
   ]
