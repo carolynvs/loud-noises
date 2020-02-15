@@ -69,7 +69,7 @@ func (a Action) DurationInMinutes() int64 {
 
 type ActionTemplate struct {
 	Name   string `json:"name"`
-	TeamId string `json:"team-id"`
+	TeamId string `json:"team"`
 	Action `json:"action"`
 }
 
@@ -118,13 +118,14 @@ type CreateTriggerRequest struct {
 }
 
 type SlackPayload struct {
-	UserId   string
+	SlackId  string
 	UserName string
 	TeamId   string
 	TeamName string
 }
 
 type OAuthRequest struct {
+	UserId    string
 	AuthGrant string
 }
 
@@ -146,7 +147,7 @@ type OAuthUser struct {
 
 func ClearStatus(r ClearStatusRequest) error {
 	fmt.Printf("Clearing Status for %s(%s) on %s(%s)\n",
-		r.UserName, r.UserId, r.TeamName, r.TeamId)
+		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	action := Action{
 		Presence: PresenceActive,
@@ -156,14 +157,19 @@ func ClearStatus(r ClearStatusRequest) error {
 
 func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 	fmt.Printf("Listing Triggers for %s(%s) on %s(%s)\n",
-		r.UserName, r.UserId, r.TeamName, r.TeamId)
+		r.UserName, r.SlackId, r.TeamName, r.TeamId)
+
+	userId, err := getCurrentUserId(r.SlackId)
+	if err != nil {
+		return slack.Msg{}, err
+	}
 
 	client, err := NewStorageClient()
 	if err != nil {
 		return slack.Msg{}, err
 	}
 
-	userDir := r.UserId + "/"
+	userDir := userId + "/"
 	blobNames, err := client.listContainer("triggers", userDir)
 	if err != nil {
 		return slack.Msg{}, err
@@ -172,7 +178,7 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 	triggers := make([]string, len(blobNames))
 	for i, blobName := range blobNames {
 		triggerName := strings.TrimPrefix(blobName, userDir)
-		trigger, err := getTrigger(r.UserId, triggerName)
+		trigger, err := getTrigger(userId, triggerName)
 		if err != nil {
 			return slack.Msg{}, err
 		}
@@ -190,9 +196,14 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 
 func Trigger(r TriggerRequest) error {
 	fmt.Printf("Triggering %s from %s(%s) on %s(%s)\n",
-		r.Name, r.UserName, r.UserId, r.TeamName, r.TeamId)
+		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
-	action, err := getTrigger(r.UserId, r.Name)
+	userId, err := getCurrentUserId(r.SlackId)
+	if err != nil {
+		return err
+	}
+
+	action, err := getTrigger(userId, r.Name)
 	if err != nil {
 		return err
 	}
@@ -200,14 +211,14 @@ func Trigger(r TriggerRequest) error {
 	return updateSlackStatus(r.SlackPayload, action.Action)
 }
 
-func RefreshOAuthToken(r OAuthRequest) error {
+func RefreshOAuthToken(r OAuthRequest) (string, error) {
 	clientId, _, err := getSecret("slack-client-id")
 	if err != nil {
-		return err
+		return "", err
 	}
 	clientSecret, _, err := getSecret("slack-client-secret")
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	data := url.Values{
@@ -217,13 +228,13 @@ func RefreshOAuthToken(r OAuthRequest) error {
 	}
 	response, err := http.DefaultClient.PostForm(SlackOAuthURL, data)
 	if err != nil {
-		return errors.Wrap(err, "error requesting oauth token")
+		return "", errors.Wrap(err, "error requesting oauth token")
 	}
 
 	var tr OAuthResponse
 	err = json.NewDecoder(response.Body).Decode(&tr)
 	if err != nil {
-		return errors.Wrap(err, "error unmarshaling oauth token response")
+		return "", errors.Wrap(err, "error unmarshaling oauth token response")
 	}
 
 	var userId string
@@ -233,7 +244,7 @@ func RefreshOAuthToken(r OAuthRequest) error {
 	} else {
 		newId, err := uuid.NewRandom()
 		if err != nil {
-			return errors.Wrapf(err, "error generating user id for slack user %s on team %s (%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
+			return "", errors.Wrapf(err, "error generating user id for slack user %s on team %s (%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
 		}
 		userId = newId.String()
 	}
@@ -246,15 +257,11 @@ func RefreshOAuthToken(r OAuthRequest) error {
 		Scopes:      tr.User.Scopes,
 	}
 	err = setSlackToken(t)
-	return errors.Wrapf(err, "error saving oauth token for %s on %s(%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
-}
-
-func lookupUserIdFromSlackId(slackId string) (string, error) {
-	return "", nil
+	return userId, errors.Wrapf(err, "error saving oauth token for %s on %s(%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
 }
 
 func updateSlackStatus(payload SlackPayload, action Action) error {
-	token, err := getSlackToken(payload.UserId)
+	token, err := getSlackToken(payload.SlackId)
 	if err != nil {
 		return err
 	}
@@ -273,7 +280,7 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 	}
 
 	if !action.DnD {
-		dndState, err := api.GetDNDInfo(&payload.UserId)
+		dndState, err := api.GetDNDInfo(&payload.SlackId)
 		if err != nil {
 			return errors.Wrapf(err, "could not retrieve user's current DND state")
 		}
@@ -295,7 +302,12 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 // CreateTrigger accepts a trigger definition and saves it
 func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 	fmt.Printf("CreateTrigger %s from %s(%s) on %s(%s)\n",
-		r.Definition, r.UserName, r.UserId, r.TeamName, r.TeamId)
+		r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+
+	userId, err := getCurrentUserId(r.SlackId)
+	if err != nil {
+		return slack.Msg{}, err
+	}
 
 	tmpl, err := parseTemplate(r.Definition)
 	if err != nil {
@@ -303,11 +315,10 @@ func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 	}
 
 	tmpl.TeamId = r.TeamId
-
 	tmplB, err := json.Marshal(tmpl)
 	if err != nil {
 		return slack.Msg{}, errors.Wrapf(err, "error marshaling trigger %s for %s(%s) on %s(%s): %#v",
-			tmpl.Name, r.UserName, r.UserId, r.TeamName, r.TeamId, tmpl)
+			tmpl.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId, tmpl)
 	}
 
 	client, err := NewStorageClient()
@@ -315,7 +326,7 @@ func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 		return slack.Msg{}, err
 	}
 
-	key := path.Join(r.UserId, tmpl.Name)
+	key := path.Join(userId, tmpl.Name)
 	err = client.setBlob("triggers", key, tmplB)
 	if err != nil {
 		return slack.Msg{}, err
@@ -350,6 +361,14 @@ func getTrigger(userId string, name string) (ActionTemplate, error) {
 	}
 
 	return action, nil
+}
+
+func getCurrentUserId(slackId string) (string, error) {
+	slackToken, err := getSlackToken(slackId)
+	if err != nil {
+		return "", err
+	}
+	return slackToken.UserId, nil
 }
 
 // parseAction definition into an Action

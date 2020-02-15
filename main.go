@@ -12,7 +12,14 @@ import (
 
 var debugFlag *bool
 
+var sessionStore = SessionStore{}
+
 func main() {
+	err := sessionStore.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	debugFlag = flag.Bool("debug", false, "Print debug statements")
 	flag.Parse()
 
@@ -31,15 +38,27 @@ func HandleHealth(writer http.ResponseWriter, request *http.Request) {
 }
 
 func HandleOAuth(writer http.ResponseWriter, request *http.Request) {
-	or := OAuthRequest{
-		AuthGrant: request.FormValue("code"),
+	session, err := sessionStore.GetCurrentSession(request, writer)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 	}
 
-	err := RefreshOAuthToken(or)
+	or := OAuthRequest{
+		AuthGrant: request.FormValue("code"),
+		UserId:    session.GetUserId(),
+	}
+
+	userId, err := RefreshOAuthToken(or)
 	if err != nil {
-		log.Printf("%v\n", err)
-		writer.WriteHeader(500)
+		// TODO: serve an error page
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	session.SetUserId(userId)
+	err = session.Save()
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 	}
 
 	http.Redirect(writer, request, "https://slackoverload.com/quickstart", 302)
@@ -145,7 +164,7 @@ func buildSlackError(err error) ([]byte, error) {
 
 func getSlackPayload(request *http.Request) SlackPayload {
 	return SlackPayload{
-		UserId:   request.FormValue("user_id"),
+		SlackId:  request.FormValue("user_id"),
 		UserName: request.FormValue("user_name"),
 		TeamId:   request.FormValue("team_id"),
 		TeamName: request.FormValue("team_domain"),
