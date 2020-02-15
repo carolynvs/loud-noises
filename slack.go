@@ -149,17 +149,22 @@ func ClearStatus(r ClearStatusRequest) error {
 	fmt.Printf("Clearing Status for %s(%s) on %s(%s)\n",
 		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
+	userId, err := lookupUserIdFromSlackId(r.SlackId)
+	if err != nil {
+		return err
+	}
+
 	action := Action{
 		Presence: PresenceActive,
 	}
-	return updateSlackStatus(r.SlackPayload, action)
+	return applyActionToAllSlacks(userId, action)
 }
 
 func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 	fmt.Printf("Listing Triggers for %s(%s) on %s(%s)\n",
 		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
-	userId, err := getCurrentUserId(r.SlackId)
+	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return slack.Msg{}, err
 	}
@@ -198,7 +203,7 @@ func Trigger(r TriggerRequest) error {
 	fmt.Printf("Triggering %s from %s(%s) on %s(%s)\n",
 		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
-	userId, err := getCurrentUserId(r.SlackId)
+	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return err
 	}
@@ -208,7 +213,7 @@ func Trigger(r TriggerRequest) error {
 		return err
 	}
 
-	return updateSlackStatus(r.SlackPayload, action.Action)
+	return applyActionToAllSlacks(userId, action.Action)
 }
 
 func RefreshOAuthToken(r OAuthRequest) (string, error) {
@@ -241,6 +246,8 @@ func RefreshOAuthToken(r OAuthRequest) (string, error) {
 	existingUser, err := getSlackToken(tr.User.Id)
 	if err == nil && existingUser.UserId != "" {
 		userId = existingUser.UserId
+	} else if r.UserId != "" {
+		userId = r.UserId
 	} else {
 		newId, err := uuid.NewRandom()
 		if err != nil {
@@ -257,11 +264,45 @@ func RefreshOAuthToken(r OAuthRequest) (string, error) {
 		Scopes:      tr.User.Scopes,
 	}
 	err = setSlackToken(t)
-	return userId, errors.Wrapf(err, "error saving oauth token for %s on %s(%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
+	if err != nil {
+		return "", errors.Wrapf(err, "error saving oauth token for %s on %s(%s)", tr.User.Id, tr.Team.Name, tr.Team.Id)
+	}
+
+	user, err := getCurrentUser(userId)
+	if err != nil {
+		return "", err
+	}
+	user.AddSlackUser(tr.User.Id, tr.Team.Id)
+	err = setCurrentUser(user)
+	if err != nil {
+		return "", errors.Wrapf(err, "error saving user mapping for %s -> %s", userId, tr.User.Id)
+	}
+
+	return userId, nil
 }
 
-func updateSlackStatus(payload SlackPayload, action Action) error {
-	token, err := getSlackToken(payload.SlackId)
+func applyActionToAllSlacks(userId string, action Action) error {
+	user, err := getCurrentUser(userId)
+	if err != nil {
+		return err
+	}
+
+	var failedTeams []string
+	for _, slackUser := range user.SlackUsers {
+		err := updateSlackStatus(slackUser.ID, action)
+		if err != nil {
+			failedTeams = append(failedTeams, slackUser.TeamID)
+		}
+	}
+
+	if len(failedTeams) > 0 {
+		return errors.Errorf("failed to update your status on teams: %s", strings.Join(failedTeams, ","))
+	}
+	return nil
+}
+
+func updateSlackStatus(slackId string, action Action) error {
+	token, err := getSlackToken(slackId)
 	if err != nil {
 		return err
 	}
@@ -280,7 +321,7 @@ func updateSlackStatus(payload SlackPayload, action Action) error {
 	}
 
 	if !action.DnD {
-		dndState, err := api.GetDNDInfo(&payload.SlackId)
+		dndState, err := api.GetDNDInfo(&slackId)
 		if err != nil {
 			return errors.Wrapf(err, "could not retrieve user's current DND state")
 		}
@@ -304,7 +345,7 @@ func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 	fmt.Printf("CreateTrigger %s from %s(%s) on %s(%s)\n",
 		r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
-	userId, err := getCurrentUserId(r.SlackId)
+	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return slack.Msg{}, err
 	}
@@ -363,12 +404,74 @@ func getTrigger(userId string, name string) (ActionTemplate, error) {
 	return action, nil
 }
 
-func getCurrentUserId(slackId string) (string, error) {
+func lookupUserIdFromSlackId(slackId string) (string, error) {
 	slackToken, err := getSlackToken(slackId)
 	if err != nil {
 		return "", err
 	}
 	return slackToken.UserId, nil
+}
+
+type User struct {
+	ID         string      `json:"id"`
+	SlackUsers []SlackUser `json:"slack-users"`
+}
+
+type SlackUser struct {
+	ID     string `json:"id"`
+	TeamID string `json:"team"`
+}
+
+func (u *User) AddSlackUser(slackId, teamId string) {
+	for _, su := range u.SlackUsers {
+		if su.ID == slackId {
+			return
+		}
+	}
+
+	u.SlackUsers = append(u.SlackUsers, SlackUser{ID: slackId, TeamID: teamId})
+}
+
+func getCurrentUser(userId string) (User, error) {
+	client, err := NewStorageClient()
+	if err != nil {
+		return User{}, err
+	}
+
+	b, err := client.getBlob("users", userId)
+	if err != nil {
+		if strings.Contains(err.Error(), "BlobNotFound") {
+			return User{ID: userId}, nil
+		}
+		return User{}, err
+	}
+
+	var user User
+	err = json.Unmarshal(b, &user)
+	if err != nil {
+		return User{}, errors.Wrapf(err, "error parsing user configuration for %q", userId)
+	}
+
+	return user, nil
+}
+
+func setCurrentUser(user User) error {
+	userId := user.ID
+	if userId == "" {
+		return errors.New("cannot save user, no ID was given")
+	}
+
+	b, err := json.Marshal(user)
+	if err != nil {
+		return errors.Wrapf(err, "error marshaling user\n%#v", user)
+	}
+
+	client, err := NewStorageClient()
+	if err != nil {
+		return err
+	}
+
+	return client.setBlob("users", userId, b)
 }
 
 // parseAction definition into an Action

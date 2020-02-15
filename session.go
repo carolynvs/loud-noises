@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/sessions"
@@ -36,7 +37,13 @@ func (s *SessionStore) GetCurrentSession(request *http.Request, writer http.Resp
 	if err != nil {
 		return Session{}, errors.Wrap(err, "error loading session for current user")
 	}
-	return Session{session: session, request: request, writer: writer}, nil
+	current := Session{session: session, request: request, writer: writer}
+
+	userId := current.GetUserId()
+	if userId != "" {
+		fmt.Println("The user is logged in as ", userId)
+	}
+	return current, nil
 }
 
 type Session struct {
