@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -24,7 +22,6 @@ func getKeyVaultClient() (keyvault.BaseClient, error) {
 }
 
 func getAzureAuth(resource string) (autorest.Authorizer, error) {
-	fmt.Println("Loading azure auth from magic...")
 	a, err := auth.NewAuthorizerFromEnvironmentWithResource(resource)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading azure auth from environment variables")

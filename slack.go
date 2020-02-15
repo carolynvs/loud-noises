@@ -17,6 +17,7 @@ import (
 	_ "github.com/google/uuid"
 	"github.com/nlopes/slack"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -146,7 +147,7 @@ type OAuthUser struct {
 }
 
 func ClearStatus(r ClearStatusRequest) error {
-	fmt.Printf("Clearing Status for %s(%s) on %s(%s)\n",
+	fmt.Printf("/clear-status for %s(%s) on %s(%s)\n",
 		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
@@ -161,7 +162,7 @@ func ClearStatus(r ClearStatusRequest) error {
 }
 
 func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
-	fmt.Printf("Listing Triggers for %s(%s) on %s(%s)\n",
+	fmt.Printf("/list-trigger for %s(%s) on %s(%s)\n",
 		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
@@ -200,7 +201,7 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 }
 
 func Trigger(r TriggerRequest) error {
-	fmt.Printf("Triggering %s from %s(%s) on %s(%s)\n",
+	fmt.Printf("/trigger %s from %s(%s) on %s(%s)\n",
 		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
@@ -287,18 +288,15 @@ func applyActionToAllSlacks(userId string, action Action) error {
 		return err
 	}
 
-	var failedTeams []string
+	var g errgroup.Group
+	// TODO: collect the failed team names, right now we don't have the team name, just id
 	for _, slackUser := range user.SlackUsers {
-		err := updateSlackStatus(slackUser.ID, action)
-		if err != nil {
-			failedTeams = append(failedTeams, slackUser.TeamID)
-		}
+		g.Go(func() error {
+			return updateSlackStatus(slackUser.ID, action)
+		})
 	}
 
-	if len(failedTeams) > 0 {
-		return errors.Errorf("failed to update your status on teams: %s", strings.Join(failedTeams, ","))
-	}
-	return nil
+	return g.Wait()
 }
 
 func updateSlackStatus(slackId string, action Action) error {
@@ -307,42 +305,46 @@ func updateSlackStatus(slackId string, action Action) error {
 		return err
 	}
 
+	fmt.Printf("Updating slack status for %s (%s) on team %s to %#v", token.UserId, token.SlackId, token.TeamId, action)
+
 	api := slack.New(token.AccessToken, slack.OptionDebug(*debugFlag))
 
-	err = api.SetUserPresence(string(action.Presence))
-	if err != nil {
-		err = errors.Wrap(err, "could not set presence")
-		return err
-	}
+	var g errgroup.Group
 
-	err = api.SetUserCustomStatus(action.StatusText, action.StatusEmoji, action.DurationInMinutes())
-	if err != nil {
+	g.Go(func() error {
+		err = api.SetUserPresence(string(action.Presence))
+		return errors.Wrap(err, "could not set presence")
+	})
+
+	g.Go(func() error {
+		err = api.SetUserCustomStatus(action.StatusText, action.StatusEmoji, action.DurationInMinutes())
 		return errors.Wrap(err, "could not set status")
-	}
+	})
 
-	if !action.DnD {
+	g.Go(func() error {
+		if action.DnD {
+			_, err = api.SetSnooze(int(action.DurationInMinutes()))
+			return errors.Wrap(err, "could not set do not disturb")
+		}
+
+		// Check if we should turn off DND
 		dndState, err := api.GetDNDInfo(&slackId)
 		if err != nil {
 			return errors.Wrapf(err, "could not retrieve user's current DND state")
 		}
 		if dndState.SnoozeEnabled {
 			_, err = api.EndSnooze()
-			if err != nil {
-				return errors.Wrap(err, "could not end do not disturb")
-			}
+			return errors.Wrap(err, "could not end do not disturb")
 		}
-	} else if action.DnD {
-		_, err = api.SetSnooze(int(action.DurationInMinutes()))
-		if err != nil {
-			return errors.Wrap(err, "could not set do not disturb")
-		}
-	}
-	return nil
+		return nil
+	})
+
+	return g.Wait()
 }
 
 // CreateTrigger accepts a trigger definition and saves it
 func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
-	fmt.Printf("CreateTrigger %s from %s(%s) on %s(%s)\n",
+	fmt.Printf("/create-trigger %q from %s(%s) on %s(%s)\n",
 		r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)

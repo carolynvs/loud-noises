@@ -156,6 +156,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:b521f10a2d8fa85c04a8ef4e62f2d1e14d303599a55d64dabf9f5a02f84d35eb"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  pruneopts = "NUT"
+  revision = "cd5d95a43a6e21273425c7ae415d3df9ea832eeb"
+
+[[projects]]
+  branch = "master"
   digest = "1:c3c62d22be48b622ed03d69280da029de14572531772763576a97c40acae09fa"
   name = "golang.org/x/sys"
   packages = [
@@ -203,6 +211,7 @@
     "github.com/gorilla/sessions",
     "github.com/nlopes/slack",
     "github.com/pkg/errors",
+    "golang.org/x/sync/errgroup",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
