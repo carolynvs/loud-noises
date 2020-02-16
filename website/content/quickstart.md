@@ -36,8 +36,24 @@ Ok, time for lunch!
 
 ## Clear your status
 
-Sadly you got back from lunch early, and want the world to know.
+Sadly, you got back from lunch early and want the world to know.
 
 ```
 /clear-status
 ```
+
+# Next steps
+
+Hopefully you think this is useful and are ready to install the app on your other
+Slack teams. Run the following command to get a magic link that will associate
+your teams together so that when you execute a trigger, it is run
+on all of your teams.
+
+```
+/link-slack
+```
+
+Use the drop down at the top right of the page to select which Slack team you
+are linking to SlackOverload.
+
+![drop down at top right of slack oauth request page listing slack teams](/img/link-slack.png)

@@ -282,6 +282,25 @@ func RefreshOAuthToken(r OAuthRequest) (string, error) {
 	return userId, nil
 }
 
+func LinkSlack(payload SlackPayload) (slack.Msg, error) {
+	slackId := payload.SlackId
+	t, err := getSlackToken(slackId)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	oauthUrl := "https://slack.com/oauth/v2/authorize"
+	scopes := "commands&user_scope=dnd:read,dnd:write,users:write,users.profile:write"
+	clientId := "2413351231.504877832356"
+	msg := slack.Msg{
+		Type: slack.ResponseTypeEphemeral,
+		Text: fmt.Sprintf("%s?scope=%s&client_id=%s&state=%s",
+			oauthUrl, scopes, clientId, t.UserId),
+	}
+
+	return msg, nil
+}
+
 func applyActionToAllSlacks(userId string, action Action) error {
 	user, err := getCurrentUser(userId)
 	if err != nil {
@@ -291,8 +310,9 @@ func applyActionToAllSlacks(userId string, action Action) error {
 	var g errgroup.Group
 	// TODO: collect the failed team names, right now we don't have the team name, just id
 	for _, slackUser := range user.SlackUsers {
+		slackId := slackUser.ID
 		g.Go(func() error {
-			return updateSlackStatus(slackUser.ID, action)
+			return updateSlackStatus(slackId, action)
 		})
 	}
 
@@ -305,7 +325,7 @@ func updateSlackStatus(slackId string, action Action) error {
 		return err
 	}
 
-	fmt.Printf("Updating slack status for %s (%s) on team %s to %#v", token.UserId, token.SlackId, token.TeamId, action)
+	fmt.Printf("Updating slack status for %s (%s) on team %s to %#v\n", token.UserId, token.SlackId, token.TeamId, action)
 
 	api := slack.New(token.AccessToken, slack.OptionDebug(*debugFlag))
 

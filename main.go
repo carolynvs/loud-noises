@@ -25,6 +25,7 @@ func main() {
 
 	http.HandleFunc("/health", HandleHealth)
 	http.HandleFunc("/oauth", HandleOAuth)
+	http.HandleFunc("/link-slack", HandleLinkSlack)
 	http.HandleFunc("/list-triggers", HandleListTriggers)
 	http.HandleFunc("/trigger", HandleTrigger)
 	http.HandleFunc("/create-trigger", HandleCreateTrigger)
@@ -37,18 +38,33 @@ func HandleHealth(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(200)
 }
 
+func HandleLinkSlack(writer http.ResponseWriter, request *http.Request) {
+	payload := getSlackPayload(request)
+	msg, err := LinkSlack(payload)
+	if err != nil {
+		ReturnError(writer, err)
+		return
+	}
+
+	ReturnResponse(writer, msg)
+}
+
 func HandleOAuth(writer http.ResponseWriter, request *http.Request) {
 	session, err := sessionStore.GetCurrentSession(request, writer)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 	}
 
+	userId := request.FormValue("state")
+	if userId == "" {
+		userId = session.GetUserId()
+	}
 	or := OAuthRequest{
 		AuthGrant: request.FormValue("code"),
-		UserId:    session.GetUserId(),
+		UserId:    userId,
 	}
 
-	userId, err := RefreshOAuthToken(or)
+	userId, err = RefreshOAuthToken(or)
 	if err != nil {
 		// TODO: serve an error page
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
