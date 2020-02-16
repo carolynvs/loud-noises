@@ -1,6 +1,7 @@
 ---
-title: Slack Overload 101
+title: QuickStart
 description: How to make Slack shut up as quickly as possible
+menu: main
 ---
 
 Now that you have Slack Overload enabled on one of your teams, what next? Open

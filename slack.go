@@ -118,6 +118,11 @@ type CreateTriggerRequest struct {
 	Definition string
 }
 
+type DeleteTriggerRequest struct {
+	SlackPayload
+	Name string
+}
+
 type SlackPayload struct {
 	SlackId  string
 	UserName string
@@ -421,6 +426,45 @@ func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 		Type: slack.ResponseTypeEphemeral,
 		Text: fmt.Sprintf("Created trigger %s", tmpl.Name),
 	}
+	return msg, nil
+}
+
+func DeleteTrigger(r DeleteTriggerRequest) (slack.Msg, error) {
+	fmt.Printf("/delete-trigger %s from %s(%s) on %s(%s)\n",
+		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+
+	userId, err := lookupUserIdFromSlackId(r.SlackId)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	client, err := NewStorageClient()
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	key := path.Join(userId, r.Name)
+	err = client.deleteBlob("triggers", key)
+	if err != nil {
+		if strings.Contains(err.Error(), "BlobNotFound") {
+			return slack.Msg{}, errors.Errorf("Could not delete trigger %q because it is not defined", r.Name)
+		}
+		return slack.Msg{}, err
+	}
+
+	msg := slack.Msg{
+		Type: slack.ResponseTypeEphemeral,
+		Blocks: slack.Blocks{BlockSet: []slack.Block{
+			slack.SectionBlock{
+				Type: slack.MBTSection,
+				Text: &slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: fmt.Sprintf("Deleted trigger *%s*", r.Name),
+				},
+			},
+		}},
+	}
+
 	return msg, nil
 }
 

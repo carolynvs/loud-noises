@@ -29,6 +29,7 @@ func main() {
 	http.HandleFunc("/list-triggers", HandleListTriggers)
 	http.HandleFunc("/trigger", HandleTrigger)
 	http.HandleFunc("/create-trigger", HandleCreateTrigger)
+	http.HandleFunc("/delete-trigger", HandleDeleteTrigger)
 	http.HandleFunc("/clear-status", HandleClearStatus)
 
 	log.Fatal(http.ListenAndServe(":80", nil))
@@ -116,6 +117,21 @@ func HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	response, err := CreateTrigger(cr)
+	if err != nil {
+		ReturnError(writer, err)
+		return
+	}
+
+	ReturnResponse(writer, response)
+}
+
+func HandleDeleteTrigger(writer http.ResponseWriter, request *http.Request) {
+	cr := DeleteTriggerRequest{
+		SlackPayload: getSlackPayload(request),
+		Name:         request.FormValue("text"),
+	}
+
+	response, err := DeleteTrigger(cr)
 	if err != nil {
 		ReturnError(writer, err)
 		return

@@ -103,6 +103,17 @@ func (s *Storage) setBlob(containerName string, blobName string, data []byte) er
 	return errors.Wrapf(err, "error saving %s/%s", containerName, blobName)
 }
 
+func (s *Storage) deleteBlob(containerName string, blobName string) error {
+	container, err := s.buildContainerURL(containerName)
+	if err != nil {
+		return err
+	}
+
+	blob := container.NewBlockBlobURL(blobName)
+	_, err = blob.Delete(context.Background(), azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
+	return errors.Wrapf(err, "error deleting blob %s/%s", containerName, blobName)
+}
+
 func (s *Storage) buildContainerURL(containerName string) (azblob.ContainerURL, error) {
 	rawURL := fmt.Sprintf("%s/%s", s.URL(), containerName)
 	URL, err := url.Parse(rawURL)
