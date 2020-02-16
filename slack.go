@@ -245,21 +245,39 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 	return msg, nil
 }
 
-func Trigger(r TriggerRequest) error {
+func Trigger(r TriggerRequest) (slack.Msg, error) {
 	fmt.Printf("/trigger %s from %s(%s) on %s(%s)\n",
 		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
-		return err
+		return slack.Msg{}, err
 	}
 
 	action, err := getTrigger(userId, r.Name)
 	if err != nil {
-		return err
+		return slack.Msg{}, err
 	}
 
-	return applyActionToAllSlacks(userId, action.Action)
+	err = applyActionToAllSlacks(userId, action.Action)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	msg := slack.Msg{
+		Type: slack.ResponseTypeEphemeral,
+		Blocks: slack.Blocks{BlockSet: []slack.Block{
+			slack.SectionBlock{
+				Type: slack.MBTSection,
+				Text: &slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: fmt.Sprintf("Triggered *%s* %s", action.Name, action.StatusEmoji),
+				},
+			},
+		}},
+	}
+
+	return msg, nil
 }
 
 func RefreshOAuthToken(r OAuthRequest) (string, error) {

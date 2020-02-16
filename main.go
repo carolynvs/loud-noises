@@ -101,13 +101,13 @@ func HandleTrigger(writer http.ResponseWriter, request *http.Request) {
 		Name:         request.FormValue("text"),
 	}
 
-	err := Trigger(tr)
+	msg, err := Trigger(tr)
 	if err != nil {
 		ReturnError(writer, err)
 		return
 	}
 
-	writer.WriteHeader(200)
+	ReturnResponse(writer, msg)
 }
 
 func HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
