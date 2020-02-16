@@ -151,19 +151,37 @@ type OAuthUser struct {
 	AccessToken string `json:"access_token"`
 }
 
-func ClearStatus(r ClearStatusRequest) error {
+func ClearStatus(r ClearStatusRequest) (slack.Msg, error) {
 	fmt.Printf("/clear-status for %s(%s) on %s(%s)\n",
 		r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
-		return err
+		return slack.Msg{}, err
 	}
 
 	action := Action{
 		Presence: PresenceActive,
 	}
-	return applyActionToAllSlacks(userId, action)
+	err = applyActionToAllSlacks(userId, action)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	msg := slack.Msg{
+		Type: slack.ResponseTypeEphemeral,
+		Blocks: slack.Blocks{BlockSet: []slack.Block{
+			slack.SectionBlock{
+				Type: slack.MBTSection,
+				Text: &slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: "Your status has been cleared :boom:",
+				},
+			},
+		}},
+	}
+
+	return msg, nil
 }
 
 func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
@@ -319,10 +337,20 @@ func LinkSlack(payload SlackPayload) (slack.Msg, error) {
 	oauthUrl := "https://slack.com/oauth/v2/authorize"
 	scopes := "commands&user_scope=dnd:read,dnd:write,users:write,users.profile:write"
 	clientId := "2413351231.504877832356"
+	magiclink := fmt.Sprintf("%s?scope=%s&client_id=%s&state=%s",
+		oauthUrl, scopes, clientId, t.UserId)
+
 	msg := slack.Msg{
 		Type: slack.ResponseTypeEphemeral,
-		Text: fmt.Sprintf("%s?scope=%s&client_id=%s&state=%s",
-			oauthUrl, scopes, clientId, t.UserId),
+		Blocks: slack.Blocks{BlockSet: []slack.Block{
+			slack.SectionBlock{
+				Type: slack.MBTSection,
+				Text: &slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: fmt.Sprintf("Click the link below to associate another Slack account with this account.\n\n<%s|Link Slack Account>", magiclink),
+				},
+			},
+		}},
 	}
 
 	return msg, nil

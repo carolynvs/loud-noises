@@ -145,13 +145,13 @@ func HandleClearStatus(writer http.ResponseWriter, request *http.Request) {
 		SlackPayload: getSlackPayload(request),
 	}
 
-	err := ClearStatus(tr)
+	msg, err := ClearStatus(tr)
 	if err != nil {
 		ReturnError(writer, err)
 		return
 	}
 
-	writer.WriteHeader(200)
+	ReturnResponse(writer, msg)
 }
 
 func ReturnResponse(writer http.ResponseWriter, msg slack.Msg) {
