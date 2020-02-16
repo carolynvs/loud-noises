@@ -181,20 +181,42 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 		return slack.Msg{}, err
 	}
 
-	triggers := make([]string, len(blobNames))
-	for i, blobName := range blobNames {
+	msg := slack.Msg{
+		ResponseType: slack.ResponseTypeEphemeral,
+		Blocks: slack.Blocks{BlockSet: []slack.Block{
+			slack.SectionBlock{
+				Type: slack.MBTSection,
+				Text: &slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: "Here are the triggers that you have defined:",
+				},
+			},
+			slack.NewDividerBlock(),
+		}},
+	}
+
+	for _, blobName := range blobNames {
 		triggerName := strings.TrimPrefix(blobName, userDir)
 		trigger, err := getTrigger(userId, triggerName)
 		if err != nil {
 			return slack.Msg{}, err
 		}
 
-		triggers[i] = trigger.ToString()
-	}
-
-	msg := slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         strings.Join(triggers, "\n"),
+		triggerBlock := slack.SectionBlock{
+			Type: slack.MBTSection,
+			Fields: []*slack.TextBlockObject{
+				{
+					Type: slack.MarkdownType,
+					Text: fmt.Sprintf("*Name*: %s\n*Status*: %s\n*Do Not Disturb*: %t\n*Default Duration*: %s",
+						trigger.Name, trigger.StatusText, trigger.DnD, trigger.Duration),
+				},
+				{
+					Type: slack.MarkdownType,
+					Text: trigger.StatusEmoji,
+				},
+			},
+		}
+		msg.Blocks.BlockSet = append(msg.Blocks.BlockSet, triggerBlock)
 	}
 
 	return msg, nil
