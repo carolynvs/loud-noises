@@ -21,10 +21,9 @@ import (
 )
 
 const (
-	PresenceAway     = "away"
-	PresenceActive   = "auto"
-	SlackOAuthURL    = "https://slack.com/api/oauth.v2.access"
-	OAuthRedirectURL = "https://cmd.slackoverload.com/oauth"
+	PresenceAway   = "away"
+	PresenceActive = "auto"
+	SlackOAuthURL  = "https://slack.com/api/oauth.v2.access"
 )
 
 type Presence string
@@ -152,8 +151,8 @@ type OAuthUser struct {
 }
 
 func ClearStatus(r ClearStatusRequest) (slack.Msg, error) {
-	fmt.Printf("/clear-status for %s(%s) on %s(%s)\n",
-		r.UserName, r.SlackId, r.TeamName, r.TeamId)
+	fmt.Printf("%s /clear-status for %s(%s) on %s(%s)\n",
+		now(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
@@ -185,8 +184,8 @@ func ClearStatus(r ClearStatusRequest) (slack.Msg, error) {
 }
 
 func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
-	fmt.Printf("/list-trigger for %s(%s) on %s(%s)\n",
-		r.UserName, r.SlackId, r.TeamName, r.TeamId)
+	fmt.Printf("%s /list-trigger for %s(%s) on %s(%s)\n",
+		now(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
@@ -246,8 +245,8 @@ func ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 }
 
 func Trigger(r TriggerRequest) (slack.Msg, error) {
-	fmt.Printf("/trigger %s from %s(%s) on %s(%s)\n",
-		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+	fmt.Printf("%s /trigger %s from %s(%s) on %s(%s)\n",
+		now(), r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
@@ -281,6 +280,9 @@ func Trigger(r TriggerRequest) (slack.Msg, error) {
 }
 
 func RefreshOAuthToken(r OAuthRequest) (string, error) {
+	fmt.Printf("%s /oauth from %s\n",
+		now(), r.UserId)
+
 	clientId, _, err := getSecret("slack-client-id")
 	if err != nil {
 		return "", err
@@ -345,8 +347,11 @@ func RefreshOAuthToken(r OAuthRequest) (string, error) {
 	return userId, nil
 }
 
-func LinkSlack(payload SlackPayload) (slack.Msg, error) {
-	slackId := payload.SlackId
+func LinkSlack(r SlackPayload) (slack.Msg, error) {
+	fmt.Printf("%s /link-slack from %s(%s) on %s(%s)\n",
+		now(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
+
+	slackId := r.SlackId
 	t, err := getSlackToken(slackId)
 	if err != nil {
 		return slack.Msg{}, err
@@ -437,8 +442,8 @@ func updateSlackStatus(slackId string, action Action) error {
 
 // CreateTrigger accepts a trigger definition and saves it
 func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
-	fmt.Printf("/create-trigger %q from %s(%s) on %s(%s)\n",
-		r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+	fmt.Printf("%s /create-trigger %q from %s(%s) on %s(%s)\n",
+		now(), r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
@@ -476,8 +481,8 @@ func CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 }
 
 func DeleteTrigger(r DeleteTriggerRequest) (slack.Msg, error) {
-	fmt.Printf("/delete-trigger %s from %s(%s) on %s(%s)\n",
-		r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+	fmt.Printf("%s /delete-trigger %s from %s(%s) on %s(%s)\n",
+		now(), r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
@@ -720,4 +725,8 @@ func setSecret(key string, value string, tags map[string]*string) error {
 	}
 
 	return nil
+}
+
+func now() string {
+	return time.Now().Format(time.RFC822)
 }
