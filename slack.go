@@ -694,12 +694,8 @@ func getSecret(key string) (string, map[string]*string, error) {
 		return "", nil, errors.Wrap(err, "could not authenticate to Azure using ambient environment")
 	}
 
-	// Timebox getting the secret because a bad client or auth will hang forever
-	cxt, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-
-	result, err := client.GetSecret(cxt, vaultURL, key, "")
+	result, err := client.GetSecret(context.Background(), vaultURL, key, "")
 	if err != nil {
-		defer cancel()
 		return "", nil, errors.Wrapf(err, "could not load secret %q from vault", key)
 	}
 
