@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -15,6 +16,7 @@ var debugFlag *bool
 var sessionStore = SessionStore{}
 
 func main() {
+	fmt.Println("Starting...")
 	err := sessionStore.Init()
 	if err != nil {
 		log.Fatal(err)
@@ -32,6 +34,7 @@ func main() {
 	http.HandleFunc("/delete-trigger", HandleDeleteTrigger)
 	http.HandleFunc("/clear-status", HandleClearStatus)
 
+	fmt.Println("Ready!")
 	log.Fatal(http.ListenAndServe(":80", nil))
 }
 

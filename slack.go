@@ -699,8 +699,10 @@ func getSecret(key string) (string, map[string]*string, error) {
 		return "", nil, errors.Wrap(err, "could not authenticate to Azure using ambient environment")
 	}
 
-	result, err := client.GetSecret(context.Background(), vaultURL, key, "")
+	cxt, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	result, err := client.GetSecret(cxt, vaultURL, key, "")
 	if err != nil {
+		defer cancel()
 		return "", nil, errors.Wrapf(err, "could not load secret %q from vault", key)
 	}
 
@@ -728,5 +730,5 @@ func setSecret(key string, value string, tags map[string]*string) error {
 }
 
 func now() string {
-	return time.Now().Format(time.RFC822)
+	return time.Now().Format("Mon 02 Jan 2006 15:04 MST")
 }
