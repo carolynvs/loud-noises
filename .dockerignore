@@ -1,3 +1,8 @@
-/slackoverload
 /website
-*.md
+/marketplace
+/*.md
+/*.sh
+/Gopkg.*
+/LICENSE
+/netlify.toml
+/.gitignore
