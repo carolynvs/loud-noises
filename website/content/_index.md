@@ -8,4 +8,4 @@ your tech stack? Updating your status on all of your Slack teams is annoying
 enough that it is almost easier to just log off or set your phone on do not
 disturb.
 
-### Slack Overload manages status across all of your teams with a single command
+<h2 align="center">Manage your status across all of your teams with a single command</h2>
