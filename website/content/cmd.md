@@ -4,10 +4,24 @@ description: Documentation for all the commands available in the SlackOverload a
 menu: main
 ---
 
+These are all of the slash commands available inside of Slack that you can run
+to interact with the Slack Overload app. If you just getting started, use the
+[QuickStart](/quickstart/) to learn how to use the Slack Overload app.
+
+* [Clear Status](#clear-status)
 * [Create Trigger](#create-trigger)
 * [Delete Trigger](#delete-trigger)
+* [Link Slack](#link-slack)
 * [List Triggers](#list-triggers)
 * [Trigger](#trigger)
+
+## Clear Status
+
+Clear your status text, emoji and remove Do Not Disturb.
+
+```
+/clear-status
+```
 
 ## Create Trigger
 
@@ -43,6 +57,16 @@ Delete a trigger by name.
 ```
 
 * **Name**: The name of the trigger. Required.
+
+## Link Slack
+
+Displays a magic link to associate another Slack account to the current one so
+that when you run Slack Overload commands, like `/trigger`, it is applied to
+that Slack account as well.
+
+```
+/link-slack
+```
 
 ## List Triggers
 

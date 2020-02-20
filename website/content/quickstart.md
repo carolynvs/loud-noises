@@ -4,8 +4,17 @@ description: How to make Slack shut up as quickly as possible
 menu: main
 ---
 
-Now that you have Slack Overload enabled on one of your teams, what next? Open
-up your Slack client and follow along...
+Before you can use Slack Overload, you need to give it access to your Slack
+account by clicking the button below, if you haven't already done so:
+
+<p align="center">
+  <a href="https://slack.com/oauth/v2/authorize?scope=commands&user_scope=dnd:read,dnd:write,users:write,users.profile:write&client_id=2413351231.504877832356">
+    <img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" />
+  </a>
+</p>
+  
+Now that you have the app enabled on one of your teams, open up your Slack
+client and follow along!
 
 ## Define a status trigger
 
