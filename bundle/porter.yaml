@@ -1,0 +1,128 @@
+name: slackoverload
+version: 0.0.3
+description: Deploy the entire Slack Overload app
+tag: carolynvs/slackoverload-app:v0.0.3
+
+credentials:
+  - name: azure_tenant_id
+    type: string
+    env: AZURE_TENANT_ID
+  - name: azure_client_id
+    type: string
+    env: AZURE_CLIENT_ID
+  - name: azure_client_secret
+    type: string
+    env: AZURE_CLIENT_SECRET
+
+parameters:
+  - name: api-version
+    type: string
+    default: "v0.0.3"
+
+mixins:
+  - az
+  - exec
+
+install:
+  - az:
+      description: "Login"
+      arguments:
+      - login
+      flags:
+        service-principal:
+        username: "{{ bundle.credentials.azure_client_id }}"
+        tenant: "{{ bundle.credentials.azure_tenant_id }}"
+        password: "{{ bundle.credentials.azure_client_secret }}"
+  - az:
+      description: "Deploy api"
+      arguments:
+      - container
+      - create
+      flags:
+        resource-group: slackoverload
+        name: slackoverload
+        image: "carolynvs/slackoverload:{{bundle.parameters.api-version}}"
+        dns-name-label: slackoverload
+        ports: 80
+        assign-identity: /subscriptions/83f90879-de5f-4c9e-9459-593fb2a17c89/resourcegroups/slackoverload/providers/Microsoft.ManagedIdentity/userAssignedIdentities/slackoverload-api
+  - exec:
+      description: "Wait for api to be healthy"
+      command: bash
+      flags:
+        c: ./wait-on-health-check.sh  
+
+upgrade:
+  - az:
+      description: "Login"
+      arguments:
+      - login
+      flags:
+        service-principal:
+        username: "{{ bundle.credentials.azure_client_id }}"
+        tenant: "{{ bundle.credentials.azure_tenant_id }}"
+        password: "{{ bundle.credentials.azure_client_secret }}"
+  - az:
+      description: "Remove previous api installation"
+      arguments:
+      - container
+      - delete
+      - --yes
+      flags:
+        resource-group: slackoverload
+        name: slackoverload
+  - az:
+      description: "Deploy api"
+      arguments:
+      - container
+      - create
+      flags:
+        resource-group: slackoverload
+        name: slackoverload
+        image: "carolynvs/slackoverload:{{bundle.parameters.api-version}}"
+        dns-name-label: slackoverload
+        ports: 80
+        assign-identity: /subscriptions/83f90879-de5f-4c9e-9459-593fb2a17c89/resourcegroups/slackoverload/providers/Microsoft.ManagedIdentity/userAssignedIdentities/slackoverload-api
+  - exec:
+      description: "Wait for api to be healthy"
+      command: bash
+      flags:
+        c: ./wait-on-health-check.sh
+
+logs:
+  - az:
+      description: "Login"
+      arguments:
+      - login
+      flags:
+        service-principal:
+        username: "{{ bundle.credentials.azure_client_id }}"
+        tenant: "{{ bundle.credentials.azure_tenant_id }}"
+        password: "{{ bundle.credentials.azure_client_secret }}"
+  - az:
+      description: "Get api logs"
+      arguments:
+      - container
+      - logs
+      flags:
+        resource-group: slackoverload
+        name: slackoverload
+
+uninstall:
+  - az:
+      description: "Login"
+      arguments:
+      - login
+      flags:
+        service-principal:
+        username: "{{ bundle.credentials.azure_client_id }}"
+        tenant: "{{ bundle.credentials.azure_tenant_id }}"
+        password: "{{ bundle.credentials.azure_client_secret }}"
+  - az:
+      description: "Remove api"
+      arguments:
+      - container
+      - delete
+      - --yes
+      flags:
+        resource-group: slackoverload
+        name: slackoverload
