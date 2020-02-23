@@ -1,6 +1,6 @@
 ---
 title: Commands
-description: Documentation for all the commands available in the SlackOverload app
+description: Documentation for all the commands available in the Slack Overload app
 menu: main
 ---
 

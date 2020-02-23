@@ -64,6 +64,6 @@ on all of your teams.
 ```
 
 Use the drop down at the top right of the page to select which Slack team you
-are linking to SlackOverload.
+are linking to Slack Overload.
 
 ![drop down at top right of slack oauth request page listing slack teams](/img/link-slack.png)
