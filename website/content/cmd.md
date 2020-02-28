@@ -13,6 +13,7 @@ to interact with the Slack Overload app. If you just getting started, use the
 * [Delete Trigger](#delete-trigger)
 * [Link Slack](#link-slack)
 * [List Triggers](#list-triggers)
+* [Mute Channel](#mute-channel)
 * [Trigger](#trigger)
 
 ## Clear Status
@@ -74,6 +75,14 @@ List all defined triggers.
 
 ```
 /list-triggers
+```
+
+## Mute Channel
+
+Mute a channel for a period of time.
+
+```
+/mute-channel for 1h
 ```
 
 ## Trigger

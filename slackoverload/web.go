@@ -26,6 +26,7 @@ func (h *SlackHandler) Init() error {
 	http.HandleFunc("/create-trigger", h.HandleCreateTrigger)
 	http.HandleFunc("/delete-trigger", h.HandleDeleteTrigger)
 	http.HandleFunc("/clear-status", h.HandleClearStatus)
+	http.HandleFunc("/mute-channel", h.HandleMuteChannel)
 
 	secrets, err := NewSecretsClient()
 	if err != nil {
@@ -156,6 +157,20 @@ func (h *SlackHandler) HandleClearStatus(writer http.ResponseWriter, request *ht
 	}
 
 	msg, err := h.ClearStatus(tr)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
+	}
+
+	h.ReturnResponse(writer, msg)
+}
+
+func (h *SlackHandler) HandleMuteChannel(writer http.ResponseWriter, request *http.Request) {
+	r := MuteChannelRequest{
+		SlackPayload: h.getSlackPayload(request),
+	}
+
+	msg, err := h.MuteChannel(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return

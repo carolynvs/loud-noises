@@ -3,6 +3,7 @@ package slackoverload
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -119,11 +120,27 @@ type DeleteTriggerRequest struct {
 	Name string
 }
 
+type MuteChannelRequest struct {
+	SlackPayload
+	Duration string
+}
+
 type SlackPayload struct {
-	SlackId  string
-	UserName string
-	TeamId   string
-	TeamName string
+	SlackId     string `json:"slack-id"`
+	UserName    string `json:"slack-user"`
+	TeamId      string `json:"team-id"`
+	TeamName    string `json:"team-name"`
+	ChannelId   string `json:"channel-id"`
+	ChannelName string `json:"channel-name"`
+}
+
+type UnmuteChannelScheduledRequest struct {
+	ScheduledRequest
+}
+
+type ScheduledRequest struct {
+	SlackPayload
+	ExecuteAt time.Time `json:"execute-at"`
 }
 
 type OAuthRequest struct {
@@ -367,7 +384,7 @@ func (a *App) LinkSlack(r SlackPayload) (slack.Msg, error) {
 	}
 
 	oauthUrl := "https://slack.com/oauth/v2/authorize"
-	scopes := "commands&user_scope=dnd:read,dnd:write,users:write,users.profile:write"
+	scopes := "commands&user_scope=dnd:read,dnd:write,users:write,users.profile:write,read,post"
 	clientId := "2413351231.504877832356"
 	magiclink := fmt.Sprintf("%s?scope=%s&client_id=%s&state=%s",
 		oauthUrl, scopes, clientId, userId)
@@ -561,6 +578,32 @@ func (a *App) handleUserNotRegistered() slack.Msg {
 	}
 
 	return msg
+}
+
+func (a *App) MuteChannel(r MuteChannelRequest) (slack.Msg, error) {
+	fmt.Printf("%s /mute-channel %s from %s(%s) on %s(%s)\n",
+		now(), r.Duration, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+
+	token, err := a.getSlackToken(r.SlackId)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	values := url.Values{
+		"token": {token.AccessToken},
+	}
+	body := strings.NewReader(values.Encode())
+	request, _ := http.NewRequest(http.MethodPost, "https://slack.com/api/users.prefs.get", body)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return slack.Msg{}, err
+	}
+
+	defer response.Body.Close()
+	result, _ := ioutil.ReadAll(response.Body)
+	fmt.Println(string(result))
+	return slack.Msg{Text: "found it!"}, nil
 }
 
 type User struct {
