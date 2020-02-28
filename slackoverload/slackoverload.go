@@ -106,17 +106,26 @@ type ListTriggersRequest struct {
 
 type TriggerRequest struct {
 	SlackPayload
-	Name string
+}
+
+func (r TriggerRequest) GetName() string {
+	return r.Text
 }
 
 type CreateTriggerRequest struct {
 	SlackPayload
-	Definition string
+}
+
+func (r CreateTriggerRequest) GetDefinition() string {
+	return r.Text
 }
 
 type DeleteTriggerRequest struct {
 	SlackPayload
-	Name string
+}
+
+func (r DeleteTriggerRequest) GetName() string {
+	return r.Text
 }
 
 type SlackPayload struct {
@@ -124,6 +133,7 @@ type SlackPayload struct {
 	UserName string
 	TeamId   string
 	TeamName string
+	Text     string
 }
 
 type OAuthRequest struct {
@@ -256,14 +266,14 @@ func (a *App) ListTriggers(r ListTriggersRequest) (slack.Msg, error) {
 
 func (a *App) Trigger(r TriggerRequest) (slack.Msg, error) {
 	fmt.Printf("%s /trigger %s from %s(%s) on %s(%s)\n",
-		now(), r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+		now(), r.GetName(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := a.lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return a.handleUserNotRegistered(), nil
 	}
 
-	action, err := a.getTrigger(userId, r.Name)
+	action, err := a.getTrigger(userId, r.GetName())
 	if err != nil {
 		return slack.Msg{}, err
 	}
@@ -452,14 +462,14 @@ func (a *App) updateSlackStatus(slackId string, action Action) error {
 // CreateTrigger accepts a trigger definition and saves it
 func (a *App) CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 	fmt.Printf("%s /create-trigger %q from %s(%s) on %s(%s)\n",
-		now(), r.Definition, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+		now(), r.GetDefinition(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := a.lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return a.handleUserNotRegistered(), nil
 	}
 
-	tmpl, err := parseTemplate(r.Definition)
+	tmpl, err := parseTemplate(r.GetDefinition())
 	if err != nil {
 		return slack.Msg{}, err
 	}
@@ -486,18 +496,18 @@ func (a *App) CreateTrigger(r CreateTriggerRequest) (slack.Msg, error) {
 
 func (a *App) DeleteTrigger(r DeleteTriggerRequest) (slack.Msg, error) {
 	fmt.Printf("%s /delete-trigger %s from %s(%s) on %s(%s)\n",
-		now(), r.Name, r.UserName, r.SlackId, r.TeamName, r.TeamId)
+		now(), r.GetName(), r.UserName, r.SlackId, r.TeamName, r.TeamId)
 
 	userId, err := a.lookupUserIdFromSlackId(r.SlackId)
 	if err != nil {
 		return a.handleUserNotRegistered(), nil
 	}
 
-	key := path.Join(userId, r.Name)
+	key := path.Join(userId, r.GetName())
 	err = a.Storage.DeleteBlob("triggers", key)
 	if err != nil {
 		if strings.Contains(err.Error(), "BlobNotFound") {
-			return slack.Msg{}, errors.Errorf("Could not delete trigger %q because it is not defined", r.Name)
+			return slack.Msg{}, errors.Errorf("Could not delete trigger %q because it is not defined", r.GetName())
 		}
 		return slack.Msg{}, err
 	}
@@ -509,7 +519,7 @@ func (a *App) DeleteTrigger(r DeleteTriggerRequest) (slack.Msg, error) {
 				Type: slack.MBTSection,
 				Text: &slack.TextBlockObject{
 					Type: slack.MarkdownType,
-					Text: fmt.Sprintf("Deleted trigger *%s*", r.Name),
+					Text: fmt.Sprintf("Deleted trigger *%s*", r.GetName()),
 				},
 			},
 		}},

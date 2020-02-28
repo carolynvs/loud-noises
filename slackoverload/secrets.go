@@ -26,6 +26,11 @@ func NewSecretsClient() (Secrets, error) {
 	return Secrets{Client: client}, nil
 }
 
+func (s *Secrets) GetSlackSigningSecret() (string, error) {
+	value, _, err := s.GetSecret("slack-signing-secret")
+	return value, err
+}
+
 func (s *Secrets) GetSessionKey() (string, error) {
 	value, _, err := s.GetSecret("session-key")
 	return value, err

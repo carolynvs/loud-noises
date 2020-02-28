@@ -3,6 +3,8 @@ package slackoverload
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -13,6 +15,8 @@ import (
 type SlackHandler struct {
 	SessionStore
 	App
+
+	signingSecret string
 }
 
 func (h *SlackHandler) Init() error {
@@ -28,6 +32,11 @@ func (h *SlackHandler) Init() error {
 	http.HandleFunc("/clear-status", h.HandleClearStatus)
 
 	secrets, err := NewSecretsClient()
+	if err != nil {
+		return err
+	}
+
+	h.signingSecret, err = secrets.GetSlackSigningSecret()
 	if err != nil {
 		return err
 	}
@@ -50,7 +59,12 @@ func (h *SlackHandler) HandleHealth(writer http.ResponseWriter, request *http.Re
 }
 
 func (h *SlackHandler) HandleLinkSlack(writer http.ResponseWriter, request *http.Request) {
-	payload := h.getSlackPayload(request)
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
+	}
+
 	msg, err := h.LinkSlack(payload)
 	if err != nil {
 		h.ReturnError(writer, err)
@@ -92,11 +106,14 @@ func (h *SlackHandler) HandleOAuth(writer http.ResponseWriter, request *http.Req
 }
 
 func (h *SlackHandler) HandleListTriggers(writer http.ResponseWriter, request *http.Request) {
-	tr := ListTriggersRequest{
-		SlackPayload: h.getSlackPayload(request),
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
 	}
 
-	response, err := h.ListTriggers(tr)
+	r := ListTriggersRequest{SlackPayload: payload}
+	response, err := h.ListTriggers(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return
@@ -106,12 +123,14 @@ func (h *SlackHandler) HandleListTriggers(writer http.ResponseWriter, request *h
 }
 
 func (h *SlackHandler) HandleTrigger(writer http.ResponseWriter, request *http.Request) {
-	tr := TriggerRequest{
-		SlackPayload: h.getSlackPayload(request),
-		Name:         request.FormValue("text"),
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
 	}
 
-	msg, err := h.Trigger(tr)
+	r := TriggerRequest{SlackPayload: payload}
+	msg, err := h.Trigger(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return
@@ -121,12 +140,14 @@ func (h *SlackHandler) HandleTrigger(writer http.ResponseWriter, request *http.R
 }
 
 func (h *SlackHandler) HandleCreateTrigger(writer http.ResponseWriter, request *http.Request) {
-	cr := CreateTriggerRequest{
-		SlackPayload: h.getSlackPayload(request),
-		Definition:   request.FormValue("text"),
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
 	}
 
-	response, err := h.CreateTrigger(cr)
+	r := CreateTriggerRequest{SlackPayload: payload}
+	response, err := h.CreateTrigger(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return
@@ -136,12 +157,14 @@ func (h *SlackHandler) HandleCreateTrigger(writer http.ResponseWriter, request *
 }
 
 func (h *SlackHandler) HandleDeleteTrigger(writer http.ResponseWriter, request *http.Request) {
-	cr := DeleteTriggerRequest{
-		SlackPayload: h.getSlackPayload(request),
-		Name:         request.FormValue("text"),
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
 	}
 
-	response, err := h.DeleteTrigger(cr)
+	r := DeleteTriggerRequest{SlackPayload: payload}
+	response, err := h.DeleteTrigger(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return
@@ -151,11 +174,14 @@ func (h *SlackHandler) HandleDeleteTrigger(writer http.ResponseWriter, request *
 }
 
 func (h *SlackHandler) HandleClearStatus(writer http.ResponseWriter, request *http.Request) {
-	tr := ClearStatusRequest{
-		SlackPayload: h.getSlackPayload(request),
+	payload, err := h.getSlackPayload(writer, request)
+	if err != nil {
+		h.ReturnError(writer, err)
+		return
 	}
 
-	msg, err := h.ClearStatus(tr)
+	r := ClearStatusRequest{SlackPayload: payload}
+	msg, err := h.ClearStatus(r)
 	if err != nil {
 		h.ReturnError(writer, err)
 		return
@@ -184,7 +210,6 @@ func (h *SlackHandler) ReturnResponse(writer http.ResponseWriter, msg slack.Msg)
 func (h *SlackHandler) ReturnError(writer http.ResponseWriter, err error) {
 	log.Printf("%v\n", err)
 	writer.Header().Set("Content-type", "application/json")
-	writer.WriteHeader(200)
 	slackErr, err := h.buildSlackError(err)
 	if err != nil {
 		err = errors.Wrap(err, "could not handle and return an error to Slack")
@@ -204,11 +229,28 @@ func (h *SlackHandler) buildSlackError(err error) ([]byte, error) {
 	return json.Marshal(response)
 }
 
-func (h *SlackHandler) getSlackPayload(request *http.Request) SlackPayload {
-	return SlackPayload{
-		SlackId:  request.FormValue("user_id"),
-		UserName: request.FormValue("user_name"),
-		TeamId:   request.FormValue("team_id"),
-		TeamName: request.FormValue("team_domain"),
+func (h *SlackHandler) getSlackPayload(writer http.ResponseWriter, request *http.Request) (SlackPayload, error) {
+	verifier, err := slack.NewSecretsVerifier(request.Header, h.signingSecret)
+	if err != nil {
+		return SlackPayload{}, errors.New("SlackOverload cannot receive requests right now")
 	}
+
+	request.Body = ioutil.NopCloser(io.TeeReader(request.Body, &verifier))
+	s, err := slack.SlashCommandParse(request)
+	if err != nil {
+		return SlackPayload{}, errors.New("SlackOverload and Slack are not talking the same language right now. We will have to try again later. Sorry!")
+	}
+
+	if err = verifier.Ensure(); err != nil {
+		writer.WriteHeader(http.StatusUnauthorized)
+		return SlackPayload{}, errors.New("Unauthorized message sent to SlackOverload. Rejected.")
+	}
+
+	return SlackPayload{
+		SlackId:  s.UserID,
+		UserName: s.UserName,
+		TeamId:   s.TeamID,
+		TeamName: s.TeamDomain,
+		Text:     s.Text,
+	}, nil
 }
